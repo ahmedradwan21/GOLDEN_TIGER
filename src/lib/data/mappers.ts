@@ -1,0 +1,80 @@
+import type { Category, Product } from '@/types';
+
+interface CategoryRow {
+  id: string;
+  slug: string;
+  name: string;
+  parent_id: string | null;
+  image_url: string | null;
+  sort_order: number;
+}
+
+interface ProductRow {
+  id: string;
+  slug: string;
+  title: string;
+  brand: string | null;
+  description: string;
+  features: string[];
+  specifications: Record<string, string> | null;
+  price_cents: number;
+  compare_at_cents: number | null;
+  stock: number;
+  images: string[];
+  video_urls: string[];
+  rating: number;
+  review_count: number;
+  tags: string[];
+  is_published: boolean;
+  category_id: string;
+  sku: string | null;
+  short_description: string | null;
+  seo_title: string | null;
+  seo_description: string | null;
+  seo_keywords: string | null;
+}
+
+export function mapCategoryRow(cat: CategoryRow, allCats: CategoryRow[]): Category {
+  const children = allCats
+    .filter((c) => c.parent_id === cat.id)
+    .sort((a, b) => a.sort_order - b.sort_order);
+  return {
+    id: cat.id,
+    slug: cat.slug,
+    name: cat.name,
+    parentId: cat.parent_id,
+    image: cat.image_url ?? '',
+    subcategories: children.map((child) => ({
+      id: child.id,
+      slug: child.slug,
+      name: child.name,
+      parentId: child.parent_id,
+      image: child.image_url ?? '',
+      subcategories: [],
+    })),
+  };
+}
+
+export function mapProductRow(p: ProductRow): Product {
+  return {
+    id: p.id,
+    slug: p.slug,
+    title: p.title,
+    brand: p.brand ?? '',
+    price: p.price_cents,
+    compareAtPrice: p.compare_at_cents ?? undefined,
+    rating: p.rating,
+    reviewCount: p.review_count,
+    stock: p.stock,
+    images: p.images,
+    videoUrls: p.video_urls,
+    features: p.features,
+    description: p.description,
+    specifications: (p.specifications as Record<string, string>) ?? {},
+    tags: p.tags,
+    categoryId: p.category_id,
+    subcategoryId: p.category_id,
+  };
+}
+
+export type { CategoryRow, ProductRow };

@@ -1,0 +1,88 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --background: #0B0B0F;
+  --surface: #14141A;
+  --surface-elevated: #1D1D26;
+  --border: #2A2A35;
+  --gold: #D4AF37;
+  --gold-light: #F2D675;
+  --gold-dark: #B8860B;
+  --tiger-orange: #E8751A;
+  --text: #F5F1E6;
+  --muted: #A8A29E;
+  --success: #22C55E;
+  --danger: #EF4444;
+  --card: #14141A;
+  --card-foreground: #F5F1E6;
+  --popover: #1D1D26;
+  --popover-foreground: #F5F1E6;
+  --radius: 0.875rem;
+}
+
+@layer base {
+  * {
+    border-color: var(--border);
+  }
+  body {
+    background-color: var(--background);
+    color: var(--text);
+  }
+  ::selection {
+    background-color: rgba(212, 175, 55, 0.3);
+    color: var(--text);
+  }
+}
+
+@layer components {
+  .gold-button {
+    @apply bg-gold-gradient text-background font-semibold transition-all duration-300 hover:bg-gold-gradient-hover hover:shadow-[0_0_20px_rgba(212,175,55,0.35)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:opacity-50 disabled:pointer-events-none;
+  }
+  .card-glow {
+    @apply transition-all duration-300 hover:shadow-[0_0_24px_rgba(212,175,55,0.18)] hover:border-gold/40;
+  }
+  .focus-ring {
+    @apply focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold focus-visible:ring-offset-2 focus-visible:ring-offset-background;
+  }
+  .line-clamp-2 {
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-track {
+  background: var(--surface);
+}
+::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--gold-dark);
+}
+
+/* Scroll snap for product sliders */
+.scroll-snap-x {
+  scroll-snap-type: x mandatory;
+}
+.scroll-snap-start {
+  scroll-snap-align: start;
+}
+
+/* Hide scrollbar for horizontal sliders */
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
