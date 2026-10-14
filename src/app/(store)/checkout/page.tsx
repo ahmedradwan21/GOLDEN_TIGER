@@ -5,17 +5,7 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { z } from 'zod';
 import { toast } from 'sonner';
-import {
-  Check,
-  Lock,
-  CreditCard,
-  Truck,
-  ChevronLeft,
-  Loader2,
-  ShieldCheck,
-  Edit3,
-  Package,
-} from 'lucide-react';
+import { Check, Lock, CreditCard, Truck, ChevronLeft, Loader as Loader2, ShieldCheck, CreditCard as Edit3, Package } from 'lucide-react';
 import { useCart } from '@/context/CartContext';
 import { useAuth } from '@/context/AuthContext';
 import {
@@ -32,6 +22,7 @@ import {
 import { SafeImage } from '@/components/ui/SafeImage';
 import { cn } from '@/lib/utils';
 import { track } from '@/lib/tracker';
+import { trackInitiateCheckout } from '@/lib/fbpixel';
 import type { ShippingDetails, DeliveryMethod } from '@/types';
 
 const SHIPPING_SCHEMA = z.object({
@@ -94,6 +85,13 @@ export default function CheckoutPage() {
   // Create or reuse order on mount
   useEffect(() => {
     if (!hydrated || items.length === 0) return;
+
+    trackInitiateCheckout({
+      contentIds: items.map((i) => i.id),
+      value: breakdown.total,
+      numItems: breakdown.itemCount,
+    });
+
     const sid = typeof window !== 'undefined'
       ? localStorage.getItem('gt_sid') || crypto.randomUUID()
       : '';

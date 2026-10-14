@@ -195,7 +195,9 @@ async function buildFacets(q: string, params: SearchParams): Promise<SearchRespo
 async function suggestCorrection(q: string): Promise<string | undefined> {
   if (!isDatabaseConfigured()) return undefined;
 
-  const { data, error } = await supabase.rpc('similarity_search', {
+  const { data, error } = await (supabase as unknown as {
+    rpc(fn: string, params: Record<string, unknown>): { select: (cols: string) => { data: unknown[] | null; error: unknown } };
+  }).rpc('similarity_search', {
     query_text: q,
     match_count: 1,
   }).select('title');

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { ShoppingCart, Zap, ShieldCheck, Truck } from 'lucide-react';
 import { Rating } from '@/components/ui/Rating';
 import { PriceTag } from '@/components/ui/PriceTag';
@@ -10,6 +10,7 @@ import { formatPrice } from '@/lib/pricing';
 import { productToSnapshot, getStockVariant, discountPercent } from '@/lib/utils';
 import { toast } from 'sonner';
 import { useRouter } from 'next/navigation';
+import { trackAddToCart, trackViewContent } from '@/lib/fbpixel';
 import type { Product } from '@/types';
 
 export function BuyBox({ product }: { product: Product }) {
@@ -23,10 +24,24 @@ export function BuyBox({ product }: { product: Product }) {
   const discount = discountPercent(product.price, product.compareAtPrice);
   const outOfStock = product.stock === 0;
 
+  useEffect(() => {
+    trackViewContent({
+      contentIds: [product.id],
+      contentName: product.title,
+      value: product.price,
+    });
+  }, [product.id, product.title, product.price]);
+
   function handleAddToCart() {
     if (outOfStock) return;
     setAdding(true);
     addItem(productToSnapshot(product), quantity);
+    trackAddToCart({
+      contentIds: [product.id],
+      contentName: product.title,
+      value: product.price,
+      quantity,
+    });
     setTimeout(() => setAdding(false), 600);
     toast.success(`${product.title} added to cart`);
   }

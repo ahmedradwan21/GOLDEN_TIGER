@@ -62,6 +62,14 @@ export interface Database {
           tags: string[];
           is_published: boolean;
           category_id: string;
+          is_sponsored: boolean;
+          is_homepage_banner: boolean;
+          ad_priority: number;
+          banner_image_url: string | null;
+          banner_headline: string | null;
+          banner_subtext: string | null;
+          ad_starts_at: string | null;
+          ad_ends_at: string | null;
           created_at: string;
           updated_at: string;
         };
@@ -89,6 +97,14 @@ export interface Database {
           tags?: string[];
           is_published?: boolean;
           category_id: string;
+          is_sponsored?: boolean;
+          is_homepage_banner?: boolean;
+          ad_priority?: number;
+          banner_image_url?: string | null;
+          banner_headline?: string | null;
+          banner_subtext?: string | null;
+          ad_starts_at?: string | null;
+          ad_ends_at?: string | null;
         };
         Update: {
           id?: string;
@@ -114,6 +130,14 @@ export interface Database {
           tags?: string[];
           is_published?: boolean;
           category_id?: string;
+          is_sponsored?: boolean;
+          is_homepage_banner?: boolean;
+          ad_priority?: number;
+          banner_image_url?: string | null;
+          banner_headline?: string | null;
+          banner_subtext?: string | null;
+          ad_starts_at?: string | null;
+          ad_ends_at?: string | null;
         };
         Relationships: [
           {

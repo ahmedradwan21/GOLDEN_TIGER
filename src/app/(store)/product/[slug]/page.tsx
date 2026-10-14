@@ -1,7 +1,7 @@
 import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import Link from 'next/link';
-import { ChevronRight, Home } from 'lucide-react';
+import { ChevronRight, Chrome as Home } from 'lucide-react';
 import {
   getProductBySlug,
   getRelatedProducts,
@@ -15,6 +15,8 @@ import { ProductTabs } from '@/components/product/ProductTabs';
 import { ProductSlider } from '@/components/product/ProductSlider';
 import { RecentlyViewed } from '@/components/product/RecentlyViewed';
 import type { Product } from '@/types';
+
+export const revalidate = 300;
 
 interface ProductPageProps {
   params: { slug: string };

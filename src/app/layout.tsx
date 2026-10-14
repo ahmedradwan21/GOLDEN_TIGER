@@ -4,6 +4,7 @@ import { Inter, Playfair_Display } from 'next/font/google';
 import { CartProvider } from '@/context/CartContext';
 import { AuthProvider } from '@/context/AuthContext';
 import { Toaster } from 'sonner';
+import { PageViewTracker } from '@/components/analytics/PageViewTracker';
 
 const inter = Inter({
   subsets: ['latin'],
@@ -54,6 +55,7 @@ export default function RootLayout({
       <body className="font-body antialiased">
         <AuthProvider>
           <CartProvider>
+            <PageViewTracker />
             {children}
             <Toaster
               position="bottom-right"

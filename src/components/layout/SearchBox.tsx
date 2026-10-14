@@ -57,7 +57,7 @@ export function SearchBox({ className }: { className?: string }) {
       return;
     }
     setLoading(true);
-    debounceRef.current = setTimeout(() => fetchSuggestions(query), 200);
+    debounceRef.current = setTimeout(() => fetchSuggestions(query), 150);
     return () => {
       if (debounceRef.current) clearTimeout(debounceRef.current);
     };

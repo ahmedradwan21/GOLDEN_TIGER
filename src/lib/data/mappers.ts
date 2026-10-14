@@ -32,6 +32,14 @@ interface ProductRow {
   seo_title: string | null;
   seo_description: string | null;
   seo_keywords: string | null;
+  is_sponsored?: boolean;
+  is_homepage_banner?: boolean;
+  ad_priority?: number;
+  banner_image_url?: string | null;
+  banner_headline?: string | null;
+  banner_subtext?: string | null;
+  ad_starts_at?: string | null;
+  ad_ends_at?: string | null;
 }
 
 export function mapCategoryRow(cat: CategoryRow, allCats: CategoryRow[]): Category {
@@ -74,6 +82,14 @@ export function mapProductRow(p: ProductRow): Product {
     tags: p.tags,
     categoryId: p.category_id,
     subcategoryId: p.category_id,
+    isSponsored: p.is_sponsored ?? false,
+    isHomepageBanner: p.is_homepage_banner ?? false,
+    adPriority: p.ad_priority ?? 0,
+    bannerImageUrl: p.banner_image_url ?? null,
+    bannerHeadline: p.banner_headline ?? null,
+    bannerSubtext: p.banner_subtext ?? null,
+    adStartsAt: p.ad_starts_at ?? null,
+    adEndsAt: p.ad_ends_at ?? null,
   };
 }
 

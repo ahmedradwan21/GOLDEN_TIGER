@@ -2,10 +2,11 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { CheckCircle, Package, Truck, Calendar, ArrowRight } from 'lucide-react';
+import { CircleCheck as CheckCircle, Package, Truck, Calendar, ArrowRight } from 'lucide-react';
 import { formatPrice } from '@/lib/pricing';
 import { SafeImage } from '@/components/ui/SafeImage';
 import { Logo } from '@/components/layout/Logo';
+import { trackPurchase } from '@/lib/fbpixel';
 import type { OrderSummary } from '@/types';
 
 interface ServerOrderData {
@@ -53,6 +54,16 @@ export function OrderConfirmationClient({ orderNumber, serverOrder }: Confirmati
     }
     setLoaded(true);
   }, [orderNumber, serverOrder]);
+
+  useEffect(() => {
+    if (!order) return;
+    trackPurchase({
+      contentIds: order.items.map((i) => i.id),
+      value: order.total,
+      numItems: order.items.reduce((sum, i) => sum + i.quantity, 0),
+      orderId: order.orderNumber,
+    });
+  }, [order]);
 
   if (!loaded) {
     return (

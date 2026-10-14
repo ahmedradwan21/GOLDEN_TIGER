@@ -25,6 +25,14 @@ export interface Product {
   tags: string[];
   categoryId: string;
   subcategoryId: string | null;
+  isSponsored: boolean;
+  isHomepageBanner: boolean;
+  adPriority: number;
+  bannerImageUrl: string | null;
+  bannerHeadline: string | null;
+  bannerSubtext: string | null;
+  adStartsAt: string | null;
+  adEndsAt: string | null;
 }
 
 export interface CartItemSnapshot {
@@ -80,6 +88,8 @@ export interface HeroSlide {
   subcopy: string;
   ctaText: string;
   ctaHref: string;
+  sponsored?: boolean;
+  productId?: string;
 }
 
 export interface PaymentInput {
@@ -94,4 +104,42 @@ export interface PaymentResult {
   success: boolean;
   message: string;
   declineCode?: string;
+}
+
+export interface SearchParams {
+  q?: string;
+  category?: string;
+  sort?: 'relevance' | 'price_asc' | 'price_desc' | 'rating' | 'newest';
+  page?: number;
+  minPrice?: number;
+  maxPrice?: number;
+  minRating?: number;
+  tags?: string[];
+}
+
+export interface SearchResponse {
+  sponsored: Product[];
+  organic: Product[];
+  total: number;
+  facets: {
+    categories: { slug: string; name: string; count: number }[];
+    tags: { tag: string; count: number }[];
+    priceRange: { min: number; max: number };
+    ratings: { min: number; count: number }[];
+  };
+  didYouMean?: string;
+}
+
+export interface ProductCardData {
+  id: string;
+  slug: string;
+  title: string;
+  brand: string;
+  price: number;
+  compareAtPrice?: number;
+  rating: number;
+  reviewCount: number;
+  images: string[];
+  stock: number;
+  isSponsored: boolean;
 }
