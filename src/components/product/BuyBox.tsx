@@ -1,12 +1,13 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { ShoppingCart, Zap, ShieldCheck, Truck } from 'lucide-react';
+import { ShoppingCart, Zap, ShieldCheck, Truck, Sparkles } from 'lucide-react';
 import { Rating } from '@/components/ui/Rating';
 import { PriceTag } from '@/components/ui/PriceTag';
 import { QuantityStepper } from '@/components/ui/QuantityStepper';
 import { useCart } from '@/context/CartContext';
 import { formatPrice } from '@/lib/pricing';
+import { calculatePoints } from '@/lib/loyalty-points';
 import { productToSnapshot, getStockVariant, discountPercent } from '@/lib/utils';
 import { toast } from 'sonner';
 import { useRouter } from 'next/navigation';
@@ -23,6 +24,7 @@ export function BuyBox({ product }: { product: Product }) {
   const maxQty = Math.min(product.stock, 10);
   const discount = discountPercent(product.price, product.compareAtPrice);
   const outOfStock = product.stock === 0;
+  const pointsEarned = calculatePoints(product.price * quantity);
 
   useEffect(() => {
     trackViewContent({
@@ -150,6 +152,19 @@ export function BuyBox({ product }: { product: Product }) {
         <div>
           <p className="text-text">FREE delivery by <span className="font-medium">{dateStr}</span></p>
           <p className="text-xs mt-0.5">Order within 4 hrs 30 mins. Express available.</p>
+        </div>
+      </div>
+
+      {/* Loyalty Points Display */}
+      <div className="flex items-center gap-2 p-3 rounded-lg bg-gold/10 border border-gold/20">
+        <Sparkles className="h-5 w-5 text-gold shrink-0" />
+        <div>
+          <p className="text-sm font-semibold text-gold">
+            Earn {pointsEarned.toLocaleString()} loyalty points
+          </p>
+          <p className="text-xs text-muted">
+            10 points per $1 spent — redeem for exclusive discount coupons
+          </p>
         </div>
       </div>
 

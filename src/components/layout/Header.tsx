@@ -12,8 +12,11 @@ import {
 } from 'lucide-react';
 import { Logo } from './Logo';
 import { SearchBox } from './SearchBox';
+import { ThemeSwitcher } from './ThemeSwitcher';
+import { LanguageSwitcher } from './LanguageSwitcher';
 import { useCart } from '@/context/CartContext';
 import { useAuth } from '@/context/AuthContext';
+import { useI18n } from '@/context/I18nContext';
 import type { Category } from '@/types';
 import { cn } from '@/lib/utils';
 import { LogOut } from 'lucide-react';
@@ -26,6 +29,7 @@ export function Header({ categories }: HeaderProps) {
   const pathname = usePathname();
   const { itemCount, openMiniCart } = useCart();
   const { user, loading: authLoading, logout } = useAuth();
+  const { t } = useI18n();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [megaOpen, setMegaOpen] = useState(false);
   const [hydrated, setHydrated] = useState(false);
@@ -66,7 +70,7 @@ export function Header({ categories }: HeaderProps) {
       <header className="sticky top-0 z-40 bg-surface/95 backdrop-blur-md border-b border-border">
         {/* Top bar */}
         <div className="bg-background/80 text-center py-1.5 text-xs text-muted border-b border-border">
-          <p>Free shipping on orders over $50 &nbsp;|&nbsp; 30-day returns &nbsp;|&nbsp; Secure payments</p>
+          <p>{t('topbar.freeship')} &nbsp;|&nbsp; {t('topbar.returns')} &nbsp;|&nbsp; {t('topbar.secure')}</p>
         </div>
 
         {/* Main header */}
@@ -90,6 +94,8 @@ export function Header({ categories }: HeaderProps) {
 
             {/* Right actions */}
             <div className="flex items-center gap-1 sm:gap-2">
+              <LanguageSwitcher />
+              <ThemeSwitcher compact />
               {authLoading ? (
                 <div className="h-10 w-10 rounded-lg flex items-center justify-center text-muted">
                   <User className="h-5 w-5" />
@@ -99,7 +105,7 @@ export function Header({ categories }: HeaderProps) {
                   <Link
                     href="/account"
                     className="flex items-center gap-2 h-10 px-3 rounded-lg hover:bg-surface-elevated focus-ring text-text"
-                    aria-label="My Account"
+                    aria-label={t('nav.account')}
                   >
                     <User className="h-5 w-5" />
                     <span className="hidden sm:inline text-sm font-medium max-w-[80px] truncate">{user.name || user.email}</span>
@@ -107,7 +113,7 @@ export function Header({ categories }: HeaderProps) {
                   <button
                     onClick={() => logout()}
                     className="flex items-center justify-center h-10 w-10 rounded-lg hover:bg-surface-elevated focus-ring text-muted hover:text-danger transition-colors"
-                    aria-label="Log out"
+                    aria-label={t('nav.logout')}
                   >
                     <LogOut className="h-4 w-4" />
                   </button>
@@ -116,10 +122,10 @@ export function Header({ categories }: HeaderProps) {
                 <Link
                   href="/login"
                   className="flex items-center gap-2 h-10 px-3 rounded-lg hover:bg-surface-elevated focus-ring text-text"
-                  aria-label="Log in"
+                  aria-label={t('nav.login')}
                 >
                   <User className="h-5 w-5" />
-                  <span className="hidden sm:inline text-sm font-medium">Login</span>
+                  <span className="hidden sm:inline text-sm font-medium">{t('nav.login')}</span>
                 </Link>
               )}
               <button

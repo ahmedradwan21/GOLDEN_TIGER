@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { searchProducts } from '@/lib/data/search';
+import { supabase } from '@/lib/db';
 import type { SearchParams } from '@/types';
 
 export async function GET(req: NextRequest) {
@@ -13,6 +14,7 @@ export async function GET(req: NextRequest) {
   const minRating = searchParams.get('minRating') ? parseInt(searchParams.get('minRating')!, 10) : undefined;
   const tagsParam = searchParams.getAll('tags');
   const tags = tagsParam.length > 0 ? tagsParam : undefined;
+  const sessionId = searchParams.get('sid') ?? null;
 
   try {
     const results = await searchProducts({
@@ -25,6 +27,19 @@ export async function GET(req: NextRequest) {
       minRating,
       tags,
     });
+
+    if (q.trim() && results.total === 0) {
+      try {
+        await supabase.from('search_audit_logs').insert({
+          query: q.trim(),
+          result_count: 0,
+          session_id: sessionId,
+        });
+      } catch {
+        // Non-critical — don't block search results
+      }
+    }
+
     return NextResponse.json(results);
   } catch {
     return NextResponse.json({

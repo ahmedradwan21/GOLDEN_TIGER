@@ -222,6 +222,8 @@ export interface Database {
           payment_ref: string | null;
           checkout_started_at: string;
           completed_at: string | null;
+          points_earned: number;
+          coupon_code: string | null;
           created_at: string;
           updated_at: string;
         };
@@ -243,6 +245,8 @@ export interface Database {
           payment_ref?: string | null;
           checkout_started_at?: string;
           completed_at?: string | null;
+          points_earned?: number;
+          coupon_code?: string | null;
         };
         Update: {
           id?: string;
@@ -262,6 +266,8 @@ export interface Database {
           payment_ref?: string | null;
           checkout_started_at?: string;
           completed_at?: string | null;
+          points_earned?: number;
+          coupon_code?: string | null;
         };
         Relationships: [
           {
@@ -371,6 +377,104 @@ export interface Database {
             referencedColumns: ['id'];
           }
         ];
+      };
+      coupons: {
+        Row: {
+          id: string;
+          code: string;
+          discount_type: string;
+          value: number;
+          max_uses: number | null;
+          uses_count: number;
+          expires_at: string | null;
+          is_reward: boolean;
+          customer_email: string | null;
+          customer_phone: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          code: string;
+          discount_type?: string;
+          value: number;
+          max_uses?: number | null;
+          uses_count?: number;
+          expires_at?: string | null;
+          is_reward?: boolean;
+          customer_email?: string | null;
+          customer_phone?: string | null;
+        };
+        Update: {
+          id?: string;
+          code?: string;
+          discount_type?: string;
+          value?: number;
+          max_uses?: number | null;
+          uses_count?: number;
+          expires_at?: string | null;
+          is_reward?: boolean;
+          customer_email?: string | null;
+          customer_phone?: string | null;
+        };
+        Relationships: [];
+      };
+      campaigns: {
+        Row: {
+          id: string;
+          type: string;
+          is_active: boolean;
+          title: string;
+          description: string | null;
+          discount_percentage: number;
+          starts_at: string | null;
+          ends_at: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          type: string;
+          is_active?: boolean;
+          title: string;
+          description?: string | null;
+          discount_percentage?: number;
+          starts_at?: string | null;
+          ends_at?: string | null;
+        };
+        Update: {
+          id?: string;
+          type?: string;
+          is_active?: boolean;
+          title?: string;
+          description?: string | null;
+          discount_percentage?: number;
+          starts_at?: string | null;
+          ends_at?: string | null;
+        };
+        Relationships: [];
+      };
+      search_audit_logs: {
+        Row: {
+          id: string;
+          query: string;
+          result_count: number;
+          session_id: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          query: string;
+          result_count?: number;
+          session_id?: string | null;
+        };
+        Update: {
+          id?: string;
+          query?: string;
+          result_count?: number;
+          session_id?: string | null;
+        };
+        Relationships: [];
       };
     };
     Views: Record<never, never>;

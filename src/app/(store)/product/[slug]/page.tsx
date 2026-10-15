@@ -14,6 +14,7 @@ import { BuyBox } from '@/components/product/BuyBox';
 import { ProductTabs } from '@/components/product/ProductTabs';
 import { ProductSlider } from '@/components/product/ProductSlider';
 import { RecentlyViewed } from '@/components/product/RecentlyViewed';
+import { LoyaltyRewards } from '@/components/product/LoyaltyRewards';
 import type { Product } from '@/types';
 
 export const revalidate = 300;
@@ -102,7 +103,10 @@ export default async function ProductPage({ params }: ProductPageProps) {
           videoUrls={product.videoUrls}
           title={product.title}
         />
-        <BuyBox product={product} />
+        <div className="space-y-6">
+          <BuyBox product={product} />
+          <LoyaltyRewards userPoints={0} />
+        </div>
       </div>
 
       {/* Tabs */}

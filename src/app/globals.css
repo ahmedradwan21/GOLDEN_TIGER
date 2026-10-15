@@ -3,6 +3,28 @@
 @tailwind utilities;
 
 :root {
+  --background: #FAFAF8;
+  --surface: #FFFFFF;
+  --surface-elevated: #F3F2EE;
+  --border: #E2E0D8;
+  --gold: #B8860B;
+  --gold-light: #D4AF37;
+  --gold-dark: #8B6914;
+  --tiger-orange: #E8751A;
+  --text: #1A1A20;
+  --muted: #6B6B70;
+  --success: #16A34A;
+  --danger: #DC2626;
+  --card: #FFFFFF;
+  --card-foreground: #1A1A20;
+  --popover: #FFFFFF;
+  --popover-foreground: #1A1A20;
+  --radius: 0.875rem;
+  --ring: #B8860B;
+  --input: #E2E0D8;
+}
+
+.dark {
   --background: #0B0B0F;
   --surface: #14141A;
   --surface-elevated: #1D1D26;
@@ -19,7 +41,8 @@
   --card-foreground: #F5F1E6;
   --popover: #1D1D26;
   --popover-foreground: #F5F1E6;
-  --radius: 0.875rem;
+  --ring: #D4AF37;
+  --input: #2A2A35;
 }
 
 @layer base {
@@ -41,7 +64,10 @@
     @apply bg-gold-gradient text-background font-semibold transition-all duration-300 hover:bg-gold-gradient-hover hover:shadow-[0_0_20px_rgba(212,175,55,0.35)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:opacity-50 disabled:pointer-events-none;
   }
   .card-glow {
-    @apply transition-all duration-300 hover:shadow-[0_0_24px_rgba(212,175,55,0.18)] hover:border-gold/40;
+    @apply transition-all duration-300 hover:shadow-[0_0_24px_rgba(212,175,55,0.18)];
+    &:hover {
+      border-color: color-mix(in srgb, var(--gold) 40%, transparent);
+    }
   }
   .focus-ring {
     @apply focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold focus-visible:ring-offset-2 focus-visible:ring-offset-background;
@@ -54,7 +80,6 @@
   }
 }
 
-/* Custom scrollbar */
 ::-webkit-scrollbar {
   width: 8px;
   height: 8px;
@@ -70,7 +95,6 @@
   background: var(--gold-dark);
 }
 
-/* Scroll snap for product sliders */
 .scroll-snap-x {
   scroll-snap-type: x mandatory;
 }
@@ -78,7 +102,6 @@
   scroll-snap-align: start;
 }
 
-/* Hide scrollbar for horizontal sliders */
 .no-scrollbar::-webkit-scrollbar {
   display: none;
 }

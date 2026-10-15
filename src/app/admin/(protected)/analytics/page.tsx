@@ -6,8 +6,9 @@ import {
   XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend,
 } from 'recharts';
 import { Card } from '@/components/ui/card';
-import { Loader2, TrendingUp, Filter } from 'lucide-react';
+import { Loader2, TrendingUp, Filter, Search, AlertTriangle, PackageX } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { useI18n } from '@/context/I18nContext';
 
 const PIE_COLORS = ['#D4AF37', '#E8751A', '#22C55E', '#3B82F6', '#A8A29E', '#EF4444'];
 
@@ -31,8 +32,11 @@ interface FunnelData {
 }
 
 export default function AdminAnalyticsPage() {
+  const { t } = useI18n();
   const [ctrData, setCtrData] = useState<CTRData | null>(null);
   const [funnelData, setFunnelData] = useState<FunnelData | null>(null);
+  const [searchGaps, setSearchGaps] = useState<{ query: string; count: number; lastSearched: string }[]>([]);
+  const [lowStock, setLowStock] = useState<{ id: string; title: string; stock: number }[]>([]);
   const [loading, setLoading] = useState(true);
   const [days, setDays] = useState(7);
 
@@ -40,12 +44,22 @@ export default function AdminAnalyticsPage() {
     async function load() {
       setLoading(true);
       try {
-        const [ctrRes, funnelRes] = await Promise.all([
+        const [ctrRes, funnelRes, gapsRes, lowStockRes] = await Promise.all([
           fetch(`/api/admin/analytics/ctr?days=${days}`),
           fetch(`/api/admin/analytics/funnel?days=${days === 7 ? 30 : days}`),
+          fetch('/api/admin/analytics/search-gaps'),
+          fetch('/api/admin/analytics/low-stock'),
         ]);
         if (ctrRes.ok) setCtrData(await ctrRes.json());
         if (funnelRes.ok) setFunnelData(await funnelRes.json());
+        if (gapsRes.ok) {
+          const gapsData = await gapsRes.json();
+          setSearchGaps(gapsData.queries ?? []);
+        }
+        if (lowStockRes.ok) {
+          const lsData = await lowStockRes.json();
+          setLowStock(lsData.products ?? []);
+        }
       } finally {
         setLoading(false);
       }
@@ -69,8 +83,8 @@ export default function AdminAnalyticsPage() {
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="font-heading text-3xl font-bold">Analytics & CTR</h1>
-          <p className="text-muted mt-1">Click-through rates, conversion funnel, and device breakdown</p>
+          <h1 className="font-heading text-3xl font-bold">{t('admin.analytics.title')}</h1>
+          <p className="text-muted mt-1">{t('admin.analytics.subtitle')}</p>
         </div>
         <div className="flex items-center gap-2">
           <Filter className="w-4 h-4 text-muted" />
@@ -91,17 +105,17 @@ export default function AdminAnalyticsPage() {
       {/* Summary KPIs */}
       {ctrData && (
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-          <SummaryCard label="Impressions" value={ctrData.summary.totalImpressions.toLocaleString()} />
-          <SummaryCard label="Clicks" value={ctrData.summary.totalClicks.toLocaleString()} />
-          <SummaryCard label="CTR" value={`${ctrData.summary.ctr}%`} highlight />
-          <SummaryCard label="Add to Cart" value={ctrData.summary.totalAddToCart.toLocaleString()} />
+          <SummaryCard label={t('admin.analytics.impressions')} value={ctrData.summary.totalImpressions.toLocaleString()} />
+          <SummaryCard label={t('admin.analytics.clicks')} value={ctrData.summary.totalClicks.toLocaleString()} />
+          <SummaryCard label={t('admin.analytics.ctr')} value={`${ctrData.summary.ctr}%`} highlight />
+          <SummaryCard label={t('admin.analytics.addToCart')} value={ctrData.summary.totalAddToCart.toLocaleString()} />
         </div>
       )}
 
       {/* Daily impressions vs clicks chart */}
       {ctrData && ctrData.dailyData.length > 0 && (
         <Card className="bg-surface border-border p-6">
-          <h2 className="font-heading text-xl font-bold mb-4">Daily Impressions vs Clicks</h2>
+          <h2 className="font-heading text-xl font-bold mb-4">{t('admin.analytics.dailyChart')}</h2>
           <ResponsiveContainer width="100%" height={300}>
             <AreaChart data={ctrData.dailyData}>
               <defs>
@@ -132,7 +146,7 @@ export default function AdminAnalyticsPage() {
           <Card className="bg-surface border-border p-6">
             <div className="flex items-center gap-2 mb-4">
               <TrendingUp className="w-5 h-5 text-gold" />
-              <h2 className="font-heading text-xl font-bold">Conversion Funnel</h2>
+              <h2 className="font-heading text-xl font-bold">{t('admin.analytics.funnel')}</h2>
             </div>
             <ResponsiveContainer width="100%" height={280}>
               <BarChart data={funnelData.stages} layout="vertical">
@@ -154,7 +168,7 @@ export default function AdminAnalyticsPage() {
               </BarChart>
             </ResponsiveContainer>
             <div className="mt-4 flex items-center justify-between">
-              <span className="text-sm text-muted">Overall Conversion</span>
+              <span className="text-sm text-muted">{t('admin.analytics.overallConversion')}</span>
               <span className="text-lg font-bold text-green-400">{funnelData.overallConversion}%</span>
             </div>
           </Card>
@@ -163,7 +177,7 @@ export default function AdminAnalyticsPage() {
         {/* Device breakdown */}
         {deviceData.length > 0 && (
           <Card className="bg-surface border-border p-6">
-            <h2 className="font-heading text-xl font-bold mb-4">Device Breakdown</h2>
+            <h2 className="font-heading text-xl font-bold mb-4">{t('admin.analytics.device')}</h2>
             <ResponsiveContainer width="100%" height={280}>
               <PieChart>
                 <Pie
@@ -186,18 +200,18 @@ export default function AdminAnalyticsPage() {
         )}
       </div>
 
-      {/* Top products by CTR */}
+      {/* Top Products by CTR */}
       {ctrData && ctrData.topProducts.length > 0 && (
         <Card className="bg-surface border-border p-6">
-          <h2 className="font-heading text-xl font-bold mb-4">Top Products by Clicks</h2>
+          <h2 className="font-heading text-xl font-bold mb-4">{t('admin.analytics.topProducts')}</h2>
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-border text-muted text-xs uppercase">
-                  <th className="text-left py-3 px-2">Product</th>
-                  <th className="text-right py-3 px-2">Impressions</th>
-                  <th className="text-right py-3 px-2">Clicks</th>
-                  <th className="text-right py-3 px-2">CTR</th>
+                  <th className="text-left py-3 px-2">{t('admin.analytics.product')}</th>
+                  <th className="text-right py-3 px-2">{t('admin.analytics.impressions')}</th>
+                  <th className="text-right py-3 px-2">{t('admin.analytics.clicks')}</th>
+                  <th className="text-right py-3 px-2">{t('admin.analytics.ctr')}</th>
                 </tr>
               </thead>
               <tbody>
@@ -218,6 +232,77 @@ export default function AdminAnalyticsPage() {
           </div>
         </Card>
       )}
+
+      {/* Search Gaps & Low Stock Warning */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Zero-Result Search Queries */}
+        <Card className="bg-surface border-border p-6">
+          <div className="flex items-center gap-2 mb-4">
+            <Search className="w-5 h-5 text-gold" />
+            <h2 className="font-heading text-xl font-bold">{t('admin.analytics.searchGaps')}</h2>
+          </div>
+          <p className="text-sm text-muted mb-3">{t('admin.analytics.searchGapsDesc')}</p>
+          {searchGaps.length > 0 ? (
+            <div className="space-y-2">
+              {searchGaps.map((gap, i) => (
+                <div key={i} className="flex items-center justify-between p-3 rounded-lg bg-surface-elevated">
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium text-text truncate">{gap.query}</p>
+                    <p className="text-xs text-muted">{new Date(gap.lastSearched).toLocaleDateString()}</p>
+                  </div>
+                  <span className="text-xs font-bold text-danger bg-danger/10 px-2.5 py-1 rounded-full shrink-0">
+                    {gap.count}x — 0 {t('admin.analytics.results')}
+                  </span>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="text-center py-8 text-muted">
+              <Search className="w-8 h-8 mx-auto mb-2 opacity-50" />
+              <p className="text-sm">{t('admin.analytics.noSearchGaps')}</p>
+            </div>
+          )}
+        </Card>
+
+        {/* Low Stock Warning */}
+        <Card className="bg-surface border-border p-6">
+          <div className="flex items-center gap-2 mb-4">
+            <AlertTriangle className="w-5 h-5 text-tiger-orange" />
+            <h2 className="font-heading text-xl font-bold">{t('admin.analytics.lowStock')}</h2>
+          </div>
+          <p className="text-sm text-muted mb-3">{t('admin.analytics.lowStockDesc')}</p>
+          {lowStock.length > 0 ? (
+            <div className="space-y-2">
+              {lowStock.map((item) => (
+                <div key={item.id} className="flex items-center justify-between p-3 rounded-lg bg-surface-elevated">
+                  <div className="min-w-0 flex items-center gap-2">
+                    {item.stock === 0 ? (
+                      <PackageX className="w-4 h-4 text-danger shrink-0" />
+                    ) : (
+                      <AlertTriangle className="w-4 h-4 text-tiger-orange shrink-0" />
+                    )}
+                    <p className="text-sm font-medium text-text truncate">{item.title}</p>
+                  </div>
+                  <span className={`text-xs font-bold px-2.5 py-1 rounded-full shrink-0 ${
+                    item.stock === 0
+                      ? 'bg-danger/10 text-danger'
+                      : item.stock <= 3
+                        ? 'bg-tiger-orange/10 text-tiger-orange'
+                        : 'bg-amber-500/10 text-amber-500'
+                  }`}>
+                    {item.stock === 0 ? t('admin.analytics.outOfStock') : `${item.stock} ${t('admin.analytics.left')}`}
+                  </span>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="text-center py-8 text-muted">
+              <AlertTriangle className="w-8 h-8 mx-auto mb-2 opacity-50" />
+              <p className="text-sm">{t('admin.analytics.allStocked')}</p>
+            </div>
+          )}
+        </Card>
+      </div>
     </div>
   );
 }

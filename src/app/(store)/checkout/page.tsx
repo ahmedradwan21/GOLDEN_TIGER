@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { z } from 'zod';
 import { toast } from 'sonner';
-import { Check, Lock, CreditCard, Truck, ChevronLeft, Loader as Loader2, ShieldCheck, CreditCard as Edit3, Package } from 'lucide-react';
+import { Check, Lock, CreditCard, Truck, ChevronLeft, Loader as Loader2, ShieldCheck, Package, Pencil } from 'lucide-react';
 import { useCart } from '@/context/CartContext';
 import { useAuth } from '@/context/AuthContext';
 import {
@@ -534,7 +534,7 @@ export default function CheckoutPage() {
                   onClick={() => setStep(1)}
                   className="flex items-center gap-1 text-sm text-gold hover:text-gold-light transition-colors"
                 >
-                  <Edit3 className="h-3.5 w-3.5" />
+                  <Pencil className="h-3.5 w-3.5" />
                   Edit
                 </button>
               </div>

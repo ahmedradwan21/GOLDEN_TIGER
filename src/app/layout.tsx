@@ -3,6 +3,8 @@ import type { Metadata } from 'next';
 import { Inter, Playfair_Display } from 'next/font/google';
 import { CartProvider } from '@/context/CartContext';
 import { AuthProvider } from '@/context/AuthContext';
+import { ThemeProvider } from '@/context/ThemeContext';
+import { I18nProvider } from '@/context/I18nContext';
 import { Toaster } from 'sonner';
 import { PageViewTracker } from '@/components/analytics/PageViewTracker';
 
@@ -51,25 +53,30 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en" className={`${inter.variable} ${playfair.variable}`}>
+    <html lang="en" className={`${inter.variable} ${playfair.variable}`} suppressHydrationWarning>
+      <head />
       <body className="font-body antialiased">
-        <AuthProvider>
-          <CartProvider>
-            <PageViewTracker />
-            {children}
-            <Toaster
-              position="bottom-right"
-              theme="dark"
-              toastOptions={{
-                style: {
-                  background: '#1D1D26',
-                  border: '1px solid #2A2A35',
-                  color: '#F5F1E6',
-                },
-              }}
-            />
-          </CartProvider>
-        </AuthProvider>
+        <ThemeProvider>
+          <I18nProvider>
+            <AuthProvider>
+              <CartProvider>
+                <PageViewTracker />
+                {children}
+                <Toaster
+                  position="bottom-right"
+                  theme="dark"
+                  toastOptions={{
+                    style: {
+                      background: 'var(--surface-elevated)',
+                      border: '1px solid var(--border)',
+                      color: 'var(--text)',
+                    },
+                  }}
+                />
+              </CartProvider>
+            </AuthProvider>
+          </I18nProvider>
+        </ThemeProvider>
       </body>
     </html>
   );

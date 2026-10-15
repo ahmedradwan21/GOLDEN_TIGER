@@ -143,3 +143,44 @@ export interface ProductCardData {
   stock: number;
   isSponsored: boolean;
 }
+
+export interface Coupon {
+  id: string;
+  code: string;
+  discountType: 'percentage' | 'fixed';
+  value: number;
+  maxUses: number | null;
+  usesCount: number;
+  expiresAt: string | null;
+  isReward: boolean;
+  customerEmail: string | null;
+  customerPhone: string | null;
+  createdAt: string;
+}
+
+export interface Campaign {
+  id: string;
+  type: 'black_friday' | 'mid_month_flash' | 'monthly_start';
+  isActive: boolean;
+  title: string;
+  description: string | null;
+  discountPercentage: number;
+  startsAt: string | null;
+  endsAt: string | null;
+}
+
+export interface CustomerLTV {
+  email: string;
+  name: string | null;
+  phone: string | null;
+  totalSpentCents: number;
+  totalOrders: number;
+  totalPoints: number;
+  isGuest: boolean;
+}
+
+export interface SearchAuditEntry {
+  query: string;
+  resultCount: number;
+  searchedAt: string;
+}
