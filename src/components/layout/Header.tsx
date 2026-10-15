@@ -80,7 +80,7 @@ export function Header({ categories }: HeaderProps) {
             <button
               className="lg:hidden flex items-center justify-center h-10 w-10 rounded-lg hover:bg-surface-elevated focus-ring text-text"
               onClick={() => setMobileOpen(true)}
-              aria-label="Open menu"
+              aria-label={t('home.openMenu')}
             >
               <Menu className="h-5 w-5" />
             </button>
@@ -131,7 +131,7 @@ export function Header({ categories }: HeaderProps) {
               <button
                 onClick={openMiniCart}
                 className="relative flex items-center justify-center h-10 w-10 rounded-lg hover:bg-surface-elevated focus-ring text-text"
-                aria-label={`Cart with ${hydrated ? itemCount : 0} items`}
+aria-label={t('home.cartItems').replace('{n}', String(hydrated ? itemCount : 0))}
               >
                 <ShoppingCart className="h-5 w-5" />
                 {hydrated && itemCount > 0 && (
@@ -161,7 +161,7 @@ export function Header({ categories }: HeaderProps) {
                   aria-expanded={megaOpen}
                   aria-haspopup="true"
                 >
-                  All Categories
+                  {t('nav.categories')}
                   <ChevronDown
                     className={cn('h-4 w-4 transition-transform', megaOpen && 'rotate-180')}
                   />
@@ -221,13 +221,13 @@ export function Header({ categories }: HeaderProps) {
               <button
                 onClick={() => setMobileOpen(false)}
                 className="h-10 w-10 flex items-center justify-center rounded-lg hover:bg-surface-elevated focus-ring"
-                aria-label="Close menu"
+                aria-label={t('home.closeMenu')}
               >
                 <X className="h-5 w-5" />
               </button>
             </div>
             <nav className="flex-1 overflow-y-auto p-4">
-              <p className="text-xs uppercase tracking-wider text-muted mb-2">Categories</p>
+              <p className="text-xs uppercase tracking-wider text-muted mb-2">{t('nav.categories')}</p>
               <ul className="space-y-1">
                 {categories.map((cat) => (
                   <li key={cat.id}>

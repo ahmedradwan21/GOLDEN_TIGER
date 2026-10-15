@@ -1,13 +1,18 @@
+'use client';
+
 import Link from 'next/link';
 import { SafeImage } from '@/components/ui/SafeImage';
+import { useI18n } from '@/context/I18nContext';
+import { cn } from '@/lib/utils';
 import type { Category } from '@/types';
 
 export function CategoryTiles({ categories }: { categories: Category[] }) {
+  const { t, dir } = useI18n();
   return (
     <section className="py-8">
       <div className="max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8">
-        <h2 className="font-heading text-xl sm:text-2xl font-bold text-text mb-6">
-          Shop by Category
+        <h2 className={cn('font-heading text-xl sm:text-2xl font-bold text-text mb-6', dir === 'rtl' && 'text-right')}>
+          {t('home.shopByCategory')}
         </h2>
         <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-3 sm:gap-4">
           {categories.map((cat) => (

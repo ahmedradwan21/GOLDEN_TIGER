@@ -1,50 +1,58 @@
+'use client';
+
 import Link from 'next/link';
 import { PawPrint, ShieldCheck, Truck, RefreshCw, Headphones } from 'lucide-react';
 import { Logo } from './Logo';
-
-const footerLinks = [
-  {
-    title: 'Shop',
-    links: [
-      { label: 'Electronics', href: '/category/electronics' },
-      { label: 'Fashion', href: '/category/fashion' },
-      { label: 'Home & Kitchen', href: '/category/home-kitchen' },
-      { label: 'Beauty', href: '/category/beauty' },
-    ],
-  },
-  {
-    title: 'Customer Service',
-    links: [
-      { label: 'Contact Us', href: '#' },
-      { label: 'Shipping Info', href: '#' },
-      { label: 'Returns & Exchanges', href: '#' },
-      { label: 'FAQ', href: '#' },
-    ],
-  },
-  {
-    title: 'About',
-    links: [
-      { label: 'Our Story', href: '#' },
-      { label: 'Careers', href: '#' },
-      { label: 'Privacy Policy', href: '#' },
-      { label: 'Terms of Service', href: '#' },
-    ],
-  },
-];
+import { useI18n } from '@/context/I18nContext';
+import { cn } from '@/lib/utils';
 
 export function Footer() {
+  const { t, dir } = useI18n();
+
+  const footerLinks = [
+    {
+      title: t('footer.shop'),
+      links: [
+        { label: t('footer.electronics'), href: '/category/electronics' },
+        { label: t('footer.fashion'), href: '/category/fashion' },
+        { label: t('footer.homeKitchen'), href: '/category/home-kitchen' },
+        { label: t('footer.beauty'), href: '/category/beauty' },
+      ],
+    },
+    {
+      title: t('footer.customerService'),
+      links: [
+        { label: t('footer.contactUs'), href: '#' },
+        { label: t('footer.shippingInfo'), href: '#' },
+        { label: t('footer.returnsExchanges'), href: '#' },
+        { label: t('footer.faq'), href: '#' },
+      ],
+    },
+    {
+      title: t('footer.about'),
+      links: [
+        { label: t('footer.ourStory'), href: '#' },
+        { label: t('footer.careers'), href: '#' },
+        { label: t('footer.privacyPolicy'), href: '#' },
+        { label: t('footer.termsOfService'), href: '#' },
+      ],
+    },
+  ];
+
+  const trustItems = [
+    { icon: Truck, title: t('footer.freeShipping'), desc: t('footer.onOrdersOver') },
+    { icon: RefreshCw, title: t('footer.30DayReturns'), desc: t('footer.hassleFree') },
+    { icon: ShieldCheck, title: t('footer.securePayments'), desc: t('footer.encryptedCheckout') },
+    { icon: Headphones, title: t('footer.247Support'), desc: t('footer.alwaysHere') },
+  ];
+
   return (
     <footer className="mt-20 border-t border-border bg-surface">
       {/* Trust bar */}
       <div className="max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8 py-8 border-b border-border">
         <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
-          {[
-            { icon: Truck, title: 'Free Shipping', desc: 'On orders over $50' },
-            { icon: RefreshCw, title: '30-Day Returns', desc: 'Hassle-free returns' },
-            { icon: ShieldCheck, title: 'Secure Payments', desc: 'Encrypted checkout' },
-            { icon: Headphones, title: '24/7 Support', desc: 'Always here to help' },
-          ].map((item) => (
-            <div key={item.title} className="flex items-center gap-3">
+          {trustItems.map((item) => (
+            <div key={item.title} className={cn('flex items-center gap-3', dir === 'rtl' && 'flex-row-reverse text-right')}>
               <div className="h-10 w-10 rounded-full bg-gold/10 flex items-center justify-center shrink-0">
                 <item.icon className="h-5 w-5 text-gold" />
               </div>
@@ -62,24 +70,23 @@ export function Footer() {
         <div className="grid grid-cols-1 md:grid-cols-4 lg:grid-cols-5 gap-8">
           <div className="lg:col-span-2">
             <Logo showTagline />
-            <p className="mt-4 text-sm text-muted max-w-xs">
-              The Golden Tiger is your premium marketplace for curated products
-              across electronics, fashion, home, and more.
+            <p className={cn('mt-4 text-sm text-muted max-w-xs', dir === 'rtl' && 'text-right')}>
+              {t('footer.aboutDesc')}
             </p>
-            <div className="mt-4 flex items-center gap-2">
+            <div className={cn('mt-4 flex items-center gap-2', dir === 'rtl' && 'flex-row-reverse')}>
               <PawPrint className="h-5 w-5 text-gold/60" />
-              <span className="text-xs text-muted">Proudly powered by The Golden Tiger</span>
+              <span className="text-xs text-muted">{t('footer.proudlyPowered')}</span>
             </div>
           </div>
           {footerLinks.map((col) => (
             <div key={col.title}>
-              <h3 className="text-sm font-semibold text-text mb-3">{col.title}</h3>
+              <h3 className={cn('text-sm font-semibold text-text mb-3', dir === 'rtl' && 'text-right')}>{col.title}</h3>
               <ul className="space-y-2">
                 {col.links.map((link) => (
                   <li key={link.label}>
                     <Link
                       href={link.href}
-                      className="text-sm text-muted hover:text-gold transition-colors"
+                      className={cn('text-sm text-muted hover:text-gold transition-colors', dir === 'rtl' && 'block text-right')}
                     >
                       {link.label}
                     </Link>
@@ -90,12 +97,12 @@ export function Footer() {
           ))}
         </div>
 
-        <div className="mt-12 pt-6 border-t border-border flex flex-col sm:flex-row items-center justify-between gap-4">
+        <div className={cn('mt-12 pt-6 border-t border-border flex flex-col sm:flex-row items-center justify-between gap-4', dir === 'rtl' && 'sm:flex-row-reverse')}>
           <p className="text-xs text-muted">
-            &copy; {new Date().getFullYear()} The Golden Tiger. All rights reserved.
+            &copy; {new Date().getFullYear()} The Golden Tiger. {t('footer.allRightsReserved')}
           </p>
           <p className="text-xs text-muted">
-            Built with care for premium shoppers.
+            {t('footer.builtWithCare')}
           </p>
         </div>
       </div>

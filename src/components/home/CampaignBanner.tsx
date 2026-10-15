@@ -2,6 +2,8 @@
 
 import { useState, useEffect } from 'react';
 import { Flame, X, Clock } from 'lucide-react';
+import { useI18n } from '@/context/I18nContext';
+import { cn } from '@/lib/utils';
 
 interface ActiveCampaign {
   id: string;
@@ -49,6 +51,7 @@ function useCountdown(targetDate: string | null): Countdown {
 }
 
 export function CampaignBanner() {
+  const { t, dir } = useI18n();
   const [campaigns, setCampaigns] = useState<ActiveCampaign[]>([]);
   const [dismissed, setDismissed] = useState(false);
 
@@ -75,8 +78,8 @@ export function CampaignBanner() {
   return (
     <div className="relative bg-gradient-to-r from-tiger-orange via-gold-dark to-gold animate-fade-in">
       <div className="max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8 py-3">
-        <div className="flex items-center justify-between gap-4">
-          <div className="flex items-center gap-3 min-w-0">
+        <div className={cn('flex items-center justify-between gap-4', dir === 'rtl' && 'flex-row-reverse')}>
+          <div className={cn('flex items-center gap-3 min-w-0', dir === 'rtl' && 'flex-row-reverse')}>
             <Flame className="h-5 w-5 text-white shrink-0 animate-pulse" />
             <div className="min-w-0">
               <p className="text-sm font-bold text-white truncate">
@@ -89,9 +92,9 @@ export function CampaignBanner() {
           </div>
 
           {campaign.endsAt && (
-            <div className="flex items-center gap-2 shrink-0">
+            <div className={cn('flex items-center gap-2 shrink-0', dir === 'rtl' && 'flex-row-reverse')}>
               <Clock className="h-4 w-4 text-white" />
-              <div className="flex items-center gap-1 text-white">
+              <div className={cn('flex items-center gap-1 text-white', dir === 'rtl' && 'flex-row-reverse')}>
                 <TimeBlock value={countdown.days} label="d" />
                 <span className="text-white/60">:</span>
                 <TimeBlock value={countdown.hours} label="h" />
@@ -106,7 +109,7 @@ export function CampaignBanner() {
           <button
             onClick={() => setDismissed(true)}
             className="text-white/80 hover:text-white shrink-0"
-            aria-label="Dismiss banner"
+            aria-label={t('home.dismissBanner')}
           >
             <X className="h-4 w-4" />
           </button>

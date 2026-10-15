@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { SafeImage } from '@/components/ui/SafeImage';
 import { cn } from '@/lib/utils';
+import { useI18n } from '@/context/I18nContext';
 import type { HeroSlide } from '@/types';
 
 interface HeroCarouselProps {
@@ -12,6 +13,7 @@ interface HeroCarouselProps {
 }
 
 export function HeroCarousel({ slides }: HeroCarouselProps) {
+  const { t, dir } = useI18n();
   const [current, setCurrent] = useState(0);
   const [paused, setPaused] = useState(false);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -43,10 +45,10 @@ export function HeroCarousel({ slides }: HeroCarouselProps) {
   function handleKeyDown(e: React.KeyboardEvent) {
     if (e.key === 'ArrowLeft') {
       e.preventDefault();
-      prev();
+      dir === 'rtl' ? next() : prev();
     } else if (e.key === 'ArrowRight') {
       e.preventDefault();
-      next();
+      dir === 'rtl' ? prev() : next();
     }
   }
 
@@ -58,8 +60,13 @@ export function HeroCarousel({ slides }: HeroCarouselProps) {
     if (touchStartX.current === null) return;
     const diff = e.changedTouches[0].clientX - touchStartX.current;
     if (Math.abs(diff) > 50) {
-      if (diff > 0) prev();
-      else next();
+      if (dir === 'rtl') {
+        if (diff > 0) next();
+        else prev();
+      } else {
+        if (diff > 0) prev();
+        else next();
+      }
     }
     touchStartX.current = null;
   }
@@ -102,12 +109,19 @@ export function HeroCarousel({ slides }: HeroCarouselProps) {
                 priority={index === 0}
               />
               <div className="absolute inset-0 bg-gradient-to-t from-background via-background/50 to-transparent" />
-              <div className="absolute inset-0 bg-gradient-to-r from-background/80 via-background/20 to-transparent" />
+              <div
+                className={cn(
+                  'absolute inset-0',
+                  dir === 'rtl'
+                    ? 'bg-gradient-to-l from-background/80 via-background/20 to-transparent'
+                    : 'bg-gradient-to-r from-background/80 via-background/20 to-transparent'
+                )}
+              />
               <div className="absolute bottom-0 left-0 right-0 p-6 sm:p-10 lg:p-16">
-                <div className="max-w-2xl">
+                <div className={cn('max-w-2xl', dir === 'rtl' && 'mr-0 ml-auto text-right')}>
                   {slide.sponsored && (
                     <span className="inline-block mb-3 bg-gold/20 text-gold text-xs font-semibold px-2.5 py-1 rounded-full backdrop-blur-sm">
-                      Sponsored
+                      {t('home.sponsored')}
                     </span>
                   )}
                   <h2 className="font-heading text-2xl sm:text-4xl lg:text-5xl font-bold text-text mb-3 leading-tight">
@@ -134,15 +148,21 @@ export function HeroCarousel({ slides }: HeroCarouselProps) {
         <>
           <button
             onClick={prev}
-            className="absolute left-4 top-1/2 -translate-y-1/2 h-10 w-10 rounded-full bg-surface/80 backdrop-blur-sm border border-border flex items-center justify-center text-text hover:bg-surface hover:text-gold transition-colors focus-ring"
-            aria-label="Previous slide"
+            className={cn(
+              'absolute top-1/2 -translate-y-1/2 h-10 w-10 rounded-full bg-surface/80 backdrop-blur-sm border border-border flex items-center justify-center text-text hover:bg-surface hover:text-gold transition-colors focus-ring',
+              dir === 'rtl' ? 'right-4' : 'left-4'
+            )}
+            aria-label={t('home.prevSlide')}
           >
             <ChevronLeft className="h-5 w-5" />
           </button>
           <button
             onClick={next}
-            className="absolute right-4 top-1/2 -translate-y-1/2 h-10 w-10 rounded-full bg-surface/80 backdrop-blur-sm border border-border flex items-center justify-center text-text hover:bg-surface hover:text-gold transition-colors focus-ring"
-            aria-label="Next slide"
+            className={cn(
+              'absolute top-1/2 -translate-y-1/2 h-10 w-10 rounded-full bg-surface/80 backdrop-blur-sm border border-border flex items-center justify-center text-text hover:bg-surface hover:text-gold transition-colors focus-ring',
+              dir === 'rtl' ? 'left-4' : 'right-4'
+            )}
+            aria-label={t('home.nextSlide')}
           >
             <ChevronRight className="h-5 w-5" />
           </button>
@@ -162,7 +182,7 @@ export function HeroCarousel({ slides }: HeroCarouselProps) {
                   ? 'w-8 bg-gold'
                   : 'w-2 bg-muted/50 hover:bg-muted'
               )}
-              aria-label={`Go to slide ${index + 1}`}
+              aria-label={`${index + 1}`}
               aria-current={index === current}
             />
           ))}

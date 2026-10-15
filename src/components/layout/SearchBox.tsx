@@ -6,6 +6,7 @@ import { Search, X, Loader as Loader2 } from 'lucide-react';
 import Link from 'next/link';
 import { cn } from '@/lib/utils';
 import { SafeImage } from '@/components/ui/SafeImage';
+import { useI18n } from '@/context/I18nContext';
 
 interface Suggestion {
   title: string;
@@ -16,6 +17,7 @@ interface Suggestion {
 
 export function SearchBox({ className }: { className?: string }) {
   const router = useRouter();
+  const { t } = useI18n();
   const [query, setQuery] = useState('');
   const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
   const [open, setOpen] = useState(false);
@@ -119,9 +121,9 @@ export function SearchBox({ className }: { className?: string }) {
             }}
             onFocus={() => setOpen(true)}
             onKeyDown={handleKeyDown}
-            placeholder="Search products..."
+            placeholder={t('nav.search')}
             className="w-full h-10 pl-10 pr-9 rounded-lg bg-surface-elevated border border-border text-sm text-text placeholder:text-muted focus-ring"
-            aria-label="Search products"
+            aria-label={t('nav.search')}
             aria-expanded={open && suggestions.length > 0}
             aria-controls="search-suggestions"
             autoComplete="off"
@@ -140,7 +142,7 @@ export function SearchBox({ className }: { className?: string }) {
                 inputRef.current?.focus();
               }}
               className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted hover:text-text"
-              aria-label="Clear search"
+              aria-label={t('home.clearSearch')}
             >
               <X className="h-4 w-4" />
             </button>
@@ -184,7 +186,7 @@ export function SearchBox({ className }: { className?: string }) {
               onClick={submitSearch}
               className="w-full px-3 py-2.5 text-sm text-gold hover:bg-surface-elevated border-t border-border font-medium"
             >
-              See all results for &ldquo;{query}&rdquo;
+              {t('home.seeAllResults')} &ldquo;{query}&rdquo;
             </button>
           </li>
         </ul>

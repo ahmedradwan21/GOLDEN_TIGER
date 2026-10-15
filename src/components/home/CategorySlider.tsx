@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { ProductCard } from '@/components/product/ProductCard';
 import { cn } from '@/lib/utils';
+import { useI18n } from '@/context/I18nContext';
 import type { Product, Category } from '@/types';
 
 interface CategorySliderProps {
@@ -15,6 +16,7 @@ interface CategorySliderProps {
 }
 
 export function CategorySlider({ title, category, products, seeAllHref }: CategorySliderProps) {
+  const { t, dir } = useI18n();
   const scrollRef = useRef<HTMLDivElement>(null);
   const [activeSub, setActiveSub] = useState<string | null>(null);
 
@@ -36,13 +38,13 @@ export function CategorySlider({ title, category, products, seeAllHref }: Catego
   return (
     <section className="py-6">
       <div className="max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex items-center justify-between mb-4">
+        <div className={cn('flex items-center justify-between mb-4', dir === 'rtl' && 'flex-row-reverse')}>
           <h2 className="font-heading text-xl sm:text-2xl font-bold text-text">{title}</h2>
           <Link
             href={seeAllHref}
             className="text-sm text-gold hover:text-gold-light transition-colors"
           >
-            See all
+            {t('home.seeAll')}
           </Link>
         </div>
 
@@ -57,7 +59,7 @@ export function CategorySlider({ title, category, products, seeAllHref }: Catego
                 : 'bg-surface-elevated text-muted hover:text-text'
             )}
           >
-            All
+            {t('home.all')}
           </button>
           {category.subcategories.map((sub) => (
             <button
@@ -78,16 +80,22 @@ export function CategorySlider({ title, category, products, seeAllHref }: Catego
         <div className="relative group">
           {/* Desktop arrows */}
           <button
-            onClick={() => scroll('left')}
-            className="absolute left-0 top-1/2 -translate-y-1/2 z-10 h-10 w-10 rounded-full bg-surface border border-border flex items-center justify-center text-text hover:text-gold transition-colors opacity-0 group-hover:opacity-100 transition-opacity hidden md:flex"
-            aria-label="Scroll left"
+            onClick={() => scroll(dir === 'rtl' ? 'right' : 'left')}
+            className={cn(
+              'absolute top-1/2 -translate-y-1/2 z-10 h-10 w-10 rounded-full bg-surface border border-border flex items-center justify-center text-text hover:text-gold transition-colors opacity-0 group-hover:opacity-100 transition-opacity hidden md:flex',
+              dir === 'rtl' ? 'right-0' : 'left-0'
+            )}
+            aria-label={t('home.scrollLeft')}
           >
             <ChevronLeft className="h-5 w-5" />
           </button>
           <button
-            onClick={() => scroll('right')}
-            className="absolute right-0 top-1/2 -translate-y-1/2 z-10 h-10 w-10 rounded-full bg-surface border border-border flex items-center justify-center text-text hover:text-gold transition-colors opacity-0 group-hover:opacity-100 transition-opacity hidden md:flex"
-            aria-label="Scroll right"
+            onClick={() => scroll(dir === 'rtl' ? 'left' : 'right')}
+            className={cn(
+              'absolute top-1/2 -translate-y-1/2 z-10 h-10 w-10 rounded-full bg-surface border border-border flex items-center justify-center text-text hover:text-gold transition-colors opacity-0 group-hover:opacity-100 transition-opacity hidden md:flex',
+              dir === 'rtl' ? 'left-0' : 'right-0'
+            )}
+            aria-label={t('home.scrollRight')}
           >
             <ChevronRight className="h-5 w-5" />
           </button>

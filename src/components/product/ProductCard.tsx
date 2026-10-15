@@ -7,6 +7,7 @@ import { SafeImage } from '@/components/ui/SafeImage';
 import { Rating } from '@/components/ui/Rating';
 import { PriceTag } from '@/components/ui/PriceTag';
 import { useCart } from '@/context/CartContext';
+import { useI18n } from '@/context/I18nContext';
 import { productToSnapshot, getStockHint } from '@/lib/utils';
 import { cn } from '@/lib/utils';
 import { track } from '@/lib/tracker';
@@ -29,6 +30,7 @@ export function ProductCard({
   onSelect,
   className,
 }: ProductCardProps) {
+  const { t, dir } = useI18n();
   const { addItem } = useCart();
   const [hovered, setHovered] = useState(false);
   const [adding, setAdding] = useState(false);
@@ -77,13 +79,13 @@ export function ProductCard({
       onMouseLeave={() => setHovered(false)}
     >
       {sponsored && (
-        <span className="absolute top-2 left-2 z-10 bg-gold/20 text-gold text-[0.625rem] font-semibold px-2 py-0.5 rounded-full backdrop-blur-sm">
-          Sponsored
+        <span className={cn('absolute top-2 z-10 bg-gold/20 text-gold text-[0.625rem] font-semibold px-2 py-0.5 rounded-full backdrop-blur-sm', dir === 'rtl' ? 'right-2' : 'left-2')}>
+          {t('home.sponsored')}
         </span>
       )}
       {outOfStock && (
-        <span className="absolute top-2 right-2 z-10 bg-danger/20 text-danger text-[0.625rem] font-semibold px-2 py-0.5 rounded-full backdrop-blur-sm">
-          Out of Stock
+        <span className={cn('absolute top-2 z-10 bg-danger/20 text-danger text-[0.625rem] font-semibold px-2 py-0.5 rounded-full backdrop-blur-sm', dir === 'rtl' ? 'left-2' : 'right-2')}>
+          {t('product.outOfStock')}
         </span>
       )}
 
@@ -94,7 +96,7 @@ export function ProductCard({
           onSelect?.(product);
         }}
         className="block"
-        aria-label={sponsored ? `Sponsored result: ${product.title}` : product.title}
+        aria-label={sponsored ? `${t('home.sponsored')}: ${product.title}` : product.title}
       >
         <div className="relative aspect-square overflow-hidden bg-surface-elevated">
           <SafeImage
@@ -117,7 +119,7 @@ export function ProductCard({
           onClick={() => onSelect?.(product)}
           className="block"
         >
-          <h3 className="text-sm font-medium text-text line-clamp-2 leading-snug min-h-[2.5rem] hover:text-gold transition-colors">
+          <h3 className={cn('text-sm font-medium text-text line-clamp-2 leading-snug min-h-[2.5rem] hover:text-gold transition-colors', dir === 'rtl' && 'text-right')}>
             {product.title}
           </h3>
         </Link>
@@ -127,7 +129,7 @@ export function ProductCard({
           compareAtPrice={product.compareAtPrice}
           size="sm"
         />
-        {stockHint && stockHint !== 'Out of Stock' && (
+        {stockHint && stockHint !== t('product.outOfStock') && (
           <p className="text-xs text-amber-500 font-medium">{stockHint}</p>
         )}
         <button
@@ -139,17 +141,17 @@ export function ProductCard({
               ? 'bg-surface-elevated text-muted cursor-not-allowed'
               : 'gold-button'
           )}
-          aria-label={`Add ${product.title} to cart`}
+          aria-label={`${t('product.addCart')} ${product.title}`}
         >
           {adding ? (
             <>
               <Zap className="h-3.5 w-3.5" />
-              Added!
+              {t('product.added')}
             </>
           ) : (
             <>
               <ShoppingCart className="h-3.5 w-3.5" />
-              {outOfStock ? 'Out of Stock' : 'Add to Cart'}
+              {outOfStock ? t('product.outOfStock') : t('product.addCart')}
             </>
           )}
         </button>
