@@ -29,7 +29,7 @@ export function Header({ categories }: HeaderProps) {
   const pathname = usePathname();
   const { itemCount, openMiniCart } = useCart();
   const { user, loading: authLoading, logout } = useAuth();
-  const { t } = useI18n();
+  const { t, dir } = useI18n();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [megaOpen, setMegaOpen] = useState(false);
   const [hydrated, setHydrated] = useState(false);
@@ -75,7 +75,7 @@ export function Header({ categories }: HeaderProps) {
 
         {/* Main header */}
         <div className="max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-between h-16 gap-4">
+          <div className={cn('flex items-center justify-between h-16 gap-4', dir === 'rtl' && 'flex-row-reverse')}>
             {/* Mobile hamburger */}
             <button
               className="lg:hidden flex items-center justify-center h-10 w-10 rounded-lg hover:bg-surface-elevated focus-ring text-text"
@@ -152,7 +152,7 @@ aria-label={t('home.cartItems').replace('{n}', String(hydrated ? itemCount : 0))
         {/* Category nav - desktop */}
         <nav className="hidden lg:block border-t border-border">
           <div className="max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8">
-            <div className="flex items-center h-11 gap-1">
+            <div className={cn('flex items-center gap-1', dir === 'rtl' && 'flex-row-reverse')}>
               {/* All categories mega menu */}
               <div ref={megaRef} className="relative">
                 <button
@@ -167,7 +167,7 @@ aria-label={t('home.cartItems').replace('{n}', String(hydrated ? itemCount : 0))
                   />
                 </button>
                 {megaOpen && (
-                  <div className="absolute top-full left-0 z-50 w-[600px] bg-surface border border-border rounded-lg shadow-2xl p-4 grid grid-cols-2 gap-4 animate-fade-in">
+                  <div className={cn('absolute top-full z-50 w-[600px] bg-surface border border-border rounded-lg shadow-2xl p-4 grid grid-cols-2 gap-4 animate-fade-in', dir === 'rtl' ? 'right-0' : 'left-0')}>
                     {categories.map((cat) => (
                       <div key={cat.id}>
                         <Link
@@ -215,8 +215,8 @@ aria-label={t('home.cartItems').replace('{n}', String(hydrated ? itemCount : 0))
             className="absolute inset-0 bg-black/60 backdrop-blur-sm"
             onClick={() => setMobileOpen(false)}
           />
-          <div className="absolute left-0 top-0 bottom-0 w-[85%] max-w-sm bg-surface border-r border-border flex flex-col animate-fade-in">
-            <div className="flex items-center justify-between p-4 border-b border-border">
+          <div className={cn('absolute top-0 bottom-0 w-[85%] max-w-sm bg-surface border-border flex flex-col animate-fade-in', dir === 'rtl' ? 'right-0 border-l' : 'left-0 border-r')}>
+            <div className={cn('flex items-center justify-between p-4 border-b border-border', dir === 'rtl' && 'flex-row-reverse')}>
               <Logo />
               <button
                 onClick={() => setMobileOpen(false)}
@@ -237,7 +237,7 @@ aria-label={t('home.cartItems').replace('{n}', String(hydrated ? itemCount : 0))
                     >
                       {cat.name}
                     </Link>
-                    <ul className="ml-3 mb-1">
+                    <ul className={cn('mb-1', dir === 'rtl' ? 'mr-3' : 'ml-3')}>
                       {cat.subcategories.map((sub) => (
                         <li key={sub.id}>
                           <Link

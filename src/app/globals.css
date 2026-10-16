@@ -109,3 +109,25 @@
   -ms-overflow-style: none;
   scrollbar-width: none;
 }
+
+/* RTL global support */
+[dir='rtl'] body {
+  text-align: right;
+}
+
+[dir='rtl'] .scroll-snap-x {
+  scroll-snap-type: x mandatory;
+}
+
+[dir='rtl'] input,
+[dir='rtl'] textarea {
+  text-align: right;
+}
+
+[dir='rtl'] table {
+  direction: rtl;
+}
+
+[dir='rtl'] .no-scrollbar {
+  direction: rtl;
+}
