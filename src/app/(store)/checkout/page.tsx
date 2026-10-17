@@ -8,6 +8,7 @@ import { toast } from 'sonner';
 import { Check, Lock, CreditCard, Truck, ChevronLeft, Loader as Loader2, ShieldCheck, Package, Pencil } from 'lucide-react';
 import { useCart } from '@/context/CartContext';
 import { useAuth } from '@/context/AuthContext';
+import { useI18n } from '@/context/I18nContext';
 import {
   formatPrice,
   computePriceBreakdown,
@@ -41,12 +42,6 @@ const COUNTRIES = [
   'United States', 'Canada', 'United Kingdom', 'Australia', 'Germany', 'France', 'Japan', 'India',
 ];
 
-const STEPS = [
-  { num: 1, label: 'Shipping', icon: Truck },
-  { num: 2, label: 'Review', icon: Package },
-  { num: 3, label: 'Payment', icon: CreditCard },
-];
-
 const FORM_STORAGE_KEY = 'golden-tiger-checkout-form';
 const DELIVERY_STORAGE_KEY = 'golden-tiger-checkout-delivery';
 
@@ -54,6 +49,8 @@ export default function CheckoutPage() {
   const router = useRouter();
   const { items, hydrated, clearCart } = useCart();
   const { user } = useAuth();
+  const { t, dir } = useI18n();
+  const BackIcon = ChevronLeft;
   const [orderId, setOrderId] = useState<string | null>(null);
   const [step, setStep] = useState(1);
   const [shipping, setShipping] = useState<ShippingDetails>({
@@ -68,10 +65,15 @@ export default function CheckoutPage() {
   const [summaryOpen, setSummaryOpen] = useState(false);
   const formRef = useRef<HTMLFormElement>(null);
 
+  const steps = [
+    { num: 1, label: t('checkout.step.shipping'), icon: Truck },
+    { num: 2, label: t('checkout.step.review'), icon: Package },
+    { num: 3, label: t('checkout.step.payment'), icon: CreditCard },
+  ];
+
   const deliveryMethod = DELIVERY_METHODS.find((d) => d.id === deliveryId) || DELIVERY_METHODS[0];
   const breakdown = computePriceBreakdown(items, deliveryMethod);
 
-  // Pre-fill from auth
   useEffect(() => {
     if (user) {
       setShipping((prev) => ({
@@ -82,7 +84,6 @@ export default function CheckoutPage() {
     }
   }, [user]);
 
-  // Create or reuse order on mount
   useEffect(() => {
     if (!hydrated || items.length === 0) return;
 
@@ -112,14 +113,12 @@ export default function CheckoutPage() {
       });
   }, [hydrated, items]);
 
-  // Redirect to cart if empty (after hydration)
   useEffect(() => {
     if (hydrated && items.length === 0) {
       router.replace('/cart');
     }
   }, [hydrated, items.length, router]);
 
-  // Load saved form state from sessionStorage
   useEffect(() => {
     try {
       const formRaw = sessionStorage.getItem(FORM_STORAGE_KEY);
@@ -136,7 +135,6 @@ export default function CheckoutPage() {
     }
   }, []);
 
-  // Save form state
   useEffect(() => {
     try {
       sessionStorage.setItem(FORM_STORAGE_KEY, JSON.stringify(shipping));
@@ -169,7 +167,6 @@ export default function CheckoutPage() {
     }
     setErrors({});
 
-    // Save shipping details to backend
     if (orderId) {
       fetch(`/api/checkout/${orderId}`, {
         method: 'PATCH',
@@ -240,7 +237,6 @@ export default function CheckoutPage() {
       return;
     }
 
-    // Complete the order on the server
     if (orderId) {
       const sid = typeof window !== 'undefined'
         ? localStorage.getItem('gt_sid') || crypto.randomUUID()
@@ -271,7 +267,6 @@ export default function CheckoutPage() {
           clearCart();
           sessionStorage.removeItem(FORM_STORAGE_KEY);
           sessionStorage.removeItem(DELIVERY_STORAGE_KEY);
-          // Save summary for fallback display
           const orderSummary = {
             orderNumber: completed.orderNumber,
             items: [...items],
@@ -298,7 +293,6 @@ export default function CheckoutPage() {
       }
     }
 
-    // Fallback: generate locally (if no DB or API failed)
     setProcessing(false);
     const { generateOrderNumber } = await import('@/lib/payments/mockGateway');
     const orderNumber = generateOrderNumber();
@@ -330,14 +324,14 @@ export default function CheckoutPage() {
       {/* Header */}
       <div className="flex items-center gap-3 mb-6">
         <Link href="/cart" className="text-muted hover:text-gold transition-colors">
-          <ChevronLeft className="h-5 w-5" />
+          <BackIcon className="h-5 w-5" />
         </Link>
-        <h1 className="font-heading text-2xl font-bold text-text">Checkout</h1>
+        <h1 className="font-heading text-2xl font-bold text-text">{t('checkout.title')}</h1>
       </div>
 
       {/* Stepper */}
       <div className="flex items-center justify-center mb-8">
-        {STEPS.map((s, index) => (
+        {steps.map((s, index) => (
           <div key={s.num} className="flex items-center">
             <div className="flex items-center gap-2">
               <div
@@ -361,7 +355,7 @@ export default function CheckoutPage() {
                 {s.label}
               </span>
             </div>
-            {index < STEPS.length - 1 && (
+            {index < steps.length - 1 && (
               <div
                 className={cn(
                   'w-12 sm:w-20 h-px mx-2',
@@ -379,9 +373,9 @@ export default function CheckoutPage() {
           {/* Step 1: Shipping */}
           {step === 1 && (
             <form ref={formRef} onSubmit={handleShippingSubmit} className="bg-surface rounded-xl border border-border p-5 sm:p-6 space-y-4">
-              <h2 className="font-heading text-lg font-bold text-text mb-2">Shipping Details</h2>
+              <h2 className="font-heading text-lg font-bold text-text mb-2">{t('checkout.shippingDetails')}</h2>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <FormField label="Full Name" error={errors.fullName}>
+                <FormField label={t('checkout.field.fullName')} error={errors.fullName}>
                   <input
                     type="text"
                     value={shipping.fullName}
@@ -391,7 +385,7 @@ export default function CheckoutPage() {
                     placeholder="John Doe"
                   />
                 </FormField>
-                <FormField label="Email" error={errors.email}>
+                <FormField label={t('common.email')} error={errors.email}>
                   <input
                     type="email"
                     value={shipping.email}
@@ -401,7 +395,7 @@ export default function CheckoutPage() {
                     placeholder="john@example.com"
                   />
                 </FormField>
-                <FormField label="Phone" error={errors.phone}>
+                <FormField label={t('checkout.field.phone')} error={errors.phone}>
                   <input
                     type="tel"
                     value={shipping.phone}
@@ -411,7 +405,7 @@ export default function CheckoutPage() {
                     placeholder="+1 234 567 8900"
                   />
                 </FormField>
-                <FormField label="Country" error={errors.country}>
+                <FormField label={t('checkout.field.country')} error={errors.country}>
                   <select
                     value={shipping.country}
                     onChange={(e) => updateShipping('country', e.target.value)}
@@ -423,7 +417,7 @@ export default function CheckoutPage() {
                     ))}
                   </select>
                 </FormField>
-                <FormField label="Address Line 1" error={errors.addressLine1} full>
+                <FormField label={t('checkout.field.addressLine1')} error={errors.addressLine1} full>
                   <input
                     type="text"
                     value={shipping.addressLine1}
@@ -433,7 +427,7 @@ export default function CheckoutPage() {
                     placeholder="123 Main Street"
                   />
                 </FormField>
-                <FormField label="Address Line 2 (Optional)" full>
+                <FormField label={t('checkout.field.addressLine2')} full>
                   <input
                     type="text"
                     value={shipping.addressLine2}
@@ -443,7 +437,7 @@ export default function CheckoutPage() {
                     placeholder="Apartment, suite, etc."
                   />
                 </FormField>
-                <FormField label="City" error={errors.city}>
+                <FormField label={t('checkout.field.city')} error={errors.city}>
                   <input
                     type="text"
                     value={shipping.city}
@@ -453,7 +447,7 @@ export default function CheckoutPage() {
                     placeholder="New York"
                   />
                 </FormField>
-                <FormField label="State / Region" error={errors.stateOrRegion}>
+                <FormField label={t('checkout.field.stateRegion')} error={errors.stateOrRegion}>
                   <input
                     type="text"
                     value={shipping.stateOrRegion}
@@ -463,7 +457,7 @@ export default function CheckoutPage() {
                     placeholder="NY"
                   />
                 </FormField>
-                <FormField label="Postal Code" error={errors.postalCode}>
+                <FormField label={t('checkout.field.postalCode')} error={errors.postalCode}>
                   <input
                     type="text"
                     value={shipping.postalCode}
@@ -477,7 +471,7 @@ export default function CheckoutPage() {
 
               {/* Delivery method */}
               <div className="pt-4 border-t border-border">
-                <h3 className="text-sm font-semibold text-text mb-3">Delivery Method</h3>
+                <h3 className="text-sm font-semibold text-text mb-3">{t('checkout.deliveryMethod')}</h3>
                 <div className="space-y-2">
                   {DELIVERY_METHODS.map((method) => {
                     const isSelected = deliveryId === method.id;
@@ -511,7 +505,7 @@ export default function CheckoutPage() {
                           <p className="text-xs text-muted">{method.description}</p>
                         </div>
                         <span className={cn('text-sm font-semibold', isFree ? 'text-success' : 'text-text')}>
-                          {isFree ? 'FREE' : formatPrice(method.fee)}
+                          {isFree ? t('common.free') : formatPrice(method.fee)}
                         </span>
                       </label>
                     );
@@ -520,7 +514,7 @@ export default function CheckoutPage() {
               </div>
 
               <button type="submit" className="w-full h-12 gold-button rounded-lg text-sm font-semibold">
-                Continue to Review
+                {t('checkout.continueToReview')}
               </button>
             </form>
           )}
@@ -529,19 +523,19 @@ export default function CheckoutPage() {
           {step === 2 && (
             <div className="bg-surface rounded-xl border border-border p-5 sm:p-6 space-y-6">
               <div className="flex items-center justify-between">
-                <h2 className="font-heading text-lg font-bold text-text">Review Your Order</h2>
+                <h2 className="font-heading text-lg font-bold text-text">{t('checkout.reviewYourOrder')}</h2>
                 <button
                   onClick={() => setStep(1)}
                   className="flex items-center gap-1 text-sm text-gold hover:text-gold-light transition-colors"
                 >
                   <Pencil className="h-3.5 w-3.5" />
-                  Edit
+                  {t('common.edit')}
                 </button>
               </div>
 
               {/* Shipping details */}
               <div>
-                <h3 className="text-sm font-semibold text-text mb-2">Shipping Address</h3>
+                <h3 className="text-sm font-semibold text-text mb-2">{t('common.shippingAddress')}</h3>
                 <div className="text-sm text-muted space-y-0.5 p-3 rounded-lg bg-surface-elevated">
                   <p className="text-text font-medium">{shipping.fullName}</p>
                   <p>{shipping.addressLine1}{shipping.addressLine2 ? `, ${shipping.addressLine2}` : ''}</p>
@@ -553,7 +547,7 @@ export default function CheckoutPage() {
 
               {/* Delivery method */}
               <div>
-                <h3 className="text-sm font-semibold text-text mb-2">Delivery Method</h3>
+                <h3 className="text-sm font-semibold text-text mb-2">{t('checkout.deliveryMethod')}</h3>
                 <div className="text-sm text-muted p-3 rounded-lg bg-surface-elevated">
                   <span className="text-text font-medium">{deliveryMethod.name}</span> - {deliveryMethod.description}
                 </div>
@@ -561,7 +555,7 @@ export default function CheckoutPage() {
 
               {/* Line items */}
               <div>
-                <h3 className="text-sm font-semibold text-text mb-2">Items ({breakdown.itemCount})</h3>
+                <h3 className="text-sm font-semibold text-text mb-2">{t('common.itemsCount').replace('{count}', String(breakdown.itemCount))}</h3>
                 <div className="space-y-3">
                   {items.map((item) => (
                     <div key={item.id} className="flex gap-3 items-center">
@@ -574,7 +568,7 @@ export default function CheckoutPage() {
                       />
                       <div className="flex-1 min-w-0">
                         <p className="text-sm font-medium text-text line-clamp-1">{item.title}</p>
-                        <p className="text-xs text-muted">Qty: {item.quantity} x {formatPrice(item.unitPrice)}</p>
+                        <p className="text-xs text-muted">{t('common.qty').replace('{qty}', String(item.quantity))} x {formatPrice(item.unitPrice)}</p>
                       </div>
                       <span className="text-sm font-semibold text-text">
                         {formatPrice(item.unitPrice * item.quantity)}
@@ -586,23 +580,23 @@ export default function CheckoutPage() {
 
               {/* Price breakdown */}
               <div className="border-t border-border pt-4 space-y-2 text-sm">
-                <div className="flex justify-between"><span className="text-muted">Subtotal</span><span className="text-text">{formatPrice(breakdown.subtotal)}</span></div>
-                <div className="flex justify-between"><span className="text-muted">Tax (8%)</span><span className="text-text">{formatPrice(breakdown.tax)}</span></div>
-                <div className="flex justify-between"><span className="text-muted">Shipping</span><span className={cn(breakdown.shipping === 0 ? 'text-success' : 'text-text')}>{breakdown.shipping === 0 ? 'FREE' : formatPrice(breakdown.shipping)}</span></div>
-                <div className="flex justify-between border-t border-border pt-2"><span className="text-text font-semibold">Total</span><span className="text-lg font-bold text-gold">{formatPrice(breakdown.total)}</span></div>
+                <div className="flex justify-between"><span className="text-muted">{t('common.subtotal')}</span><span className="text-text">{formatPrice(breakdown.subtotal)}</span></div>
+                <div className="flex justify-between"><span className="text-muted">{t('checkout.tax8pct')}</span><span className="text-text">{formatPrice(breakdown.tax)}</span></div>
+                <div className="flex justify-between"><span className="text-muted">{t('common.shipping')}</span><span className={cn(breakdown.shipping === 0 ? 'text-success' : 'text-text')}>{breakdown.shipping === 0 ? t('common.free') : formatPrice(breakdown.shipping)}</span></div>
+                <div className="flex justify-between border-t border-border pt-2"><span className="text-text font-semibold">{t('common.total')}</span><span className="text-lg font-bold text-gold">{formatPrice(breakdown.total)}</span></div>
               </div>
 
               <button
                 onClick={() => setStep(3)}
                 className="w-full h-12 gold-button rounded-lg text-sm font-semibold"
               >
-                Continue to Payment
+                {t('checkout.continueToPayment')}
               </button>
               <button
                 onClick={() => setStep(1)}
                 className="w-full h-10 rounded-lg border border-border text-sm font-medium text-text hover:bg-surface-elevated transition-colors"
               >
-                Back to Shipping
+                {t('checkout.backToShipping')}
               </button>
             </div>
           )}
@@ -614,27 +608,27 @@ export default function CheckoutPage() {
               {processing && (
                 <div className="absolute inset-0 z-10 bg-surface/90 rounded-xl flex flex-col items-center justify-center">
                   <Loader2 className="h-10 w-10 text-gold animate-spin mb-4" />
-                  <p className="text-sm text-text font-medium">Processing payment...</p>
-                  <p className="text-xs text-muted mt-1">Please do not close this page.</p>
+                  <p className="text-sm text-text font-medium">{t('checkout.processingPayment')}</p>
+                  <p className="text-xs text-muted mt-1">{t('checkout.doNotClose')}</p>
                 </div>
               )}
 
               {/* Demo banner */}
               <div className="flex items-center gap-2 p-3 rounded-lg bg-tiger-orange/10 border border-tiger-orange/30">
                 <span className="text-xs text-tiger-orange font-medium">
-                  Demo mode: no real charges are made. Use 4242 4242 4242 4242 for success.
+                  {t('checkout.demoBanner')}
                 </span>
               </div>
 
-              <h2 className="font-heading text-lg font-bold text-text">Payment Details</h2>
+              <h2 className="font-heading text-lg font-bold text-text">{t('checkout.paymentDetails')}</h2>
 
               {/* Secured badge */}
               <div className="flex items-center gap-2 text-sm text-muted">
                 <Lock className="h-4 w-4 text-gold" />
-                Secured by <span className="font-medium text-gold">Golden Shield</span>
+                {t('checkout.securedBy')} <span className="font-medium text-gold">{t('checkout.goldenShield')}</span>
               </div>
 
-              <FormField label="Name on Card" error={paymentError && !payment.nameOnCard ? paymentError : ''}>
+              <FormField label={t('checkout.field.nameOnCard')} error={paymentError && !payment.nameOnCard ? paymentError : ''}>
                 <input
                   type="text"
                   value={payment.nameOnCard}
@@ -645,7 +639,7 @@ export default function CheckoutPage() {
                 />
               </FormField>
 
-              <FormField label="Card Number" error="">
+              <FormField label={t('checkout.field.cardNumber')} error="">
                 <input
                   type="text"
                   inputMode="numeric"
@@ -659,7 +653,7 @@ export default function CheckoutPage() {
               </FormField>
 
               <div className="grid grid-cols-2 gap-4">
-                <FormField label="Expiry (MM/YY)" error="">
+                <FormField label={t('checkout.field.expiry')} error="">
                   <input
                     type="text"
                     inputMode="numeric"
@@ -671,7 +665,7 @@ export default function CheckoutPage() {
                     maxLength={5}
                   />
                 </FormField>
-                <FormField label="CVC" error="">
+                <FormField label={t('checkout.field.cvc')} error="">
                   <input
                     type="text"
                     inputMode="numeric"
@@ -693,19 +687,19 @@ export default function CheckoutPage() {
 
               <div className="flex items-center gap-2 text-xs text-muted">
                 <ShieldCheck className="h-3.5 w-3.5 text-gold" />
-                Your payment information is encrypted and never stored.
+                {t('checkout.encryptedNote')}
               </div>
 
               <button type="submit" disabled={processing} className="w-full h-12 gold-button rounded-lg text-sm font-semibold flex items-center justify-center gap-2">
                 {processing ? (
                   <>
                     <Loader2 className="h-4 w-4 animate-spin" />
-                    Processing...
+                    {t('checkout.processing')}
                   </>
                 ) : (
                   <>
                     <Lock className="h-4 w-4" />
-                    Pay {formatPrice(breakdown.total)}
+                    {t('checkout.pay').replace('{amount}', formatPrice(breakdown.total))}
                   </>
                 )}
               </button>
@@ -715,7 +709,7 @@ export default function CheckoutPage() {
                 disabled={processing}
                 className="w-full h-10 rounded-lg border border-border text-sm font-medium text-text hover:bg-surface-elevated transition-colors"
               >
-                Back to Review
+                {t('checkout.backToReview')}
               </button>
             </form>
           )}
@@ -729,7 +723,7 @@ export default function CheckoutPage() {
             className="w-full lg:hidden flex items-center justify-between p-4 rounded-lg bg-surface border border-border mb-4"
           >
             <span className="text-sm font-semibold text-text">
-              Order Summary ({formatPrice(breakdown.total)})
+              {t('checkout.orderSummaryWithTotal').replace('{total}', formatPrice(breakdown.total))}
             </span>
             <ChevronLeft className={cn('h-4 w-4 text-muted transition-transform', summaryOpen && '-rotate-90')} />
           </button>
@@ -738,7 +732,7 @@ export default function CheckoutPage() {
             'bg-surface rounded-xl border border-border p-5 lg:sticky lg:top-24',
             !summaryOpen && 'hidden lg:block'
           )}>
-            <h2 className="font-heading text-lg font-bold text-text mb-4">Order Summary</h2>
+            <h2 className="font-heading text-lg font-bold text-text mb-4">{t('common.orderSummary')}</h2>
 
             {/* Items */}
             <div className="space-y-3 mb-4 max-h-[300px] overflow-y-auto">
@@ -763,11 +757,11 @@ export default function CheckoutPage() {
             </div>
 
             <div className="border-t border-border pt-4 space-y-2 text-sm">
-              <div className="flex justify-between"><span className="text-muted">Subtotal</span><span className="text-text">{formatPrice(breakdown.subtotal)}</span></div>
-              <div className="flex justify-between"><span className="text-muted">Tax</span><span className="text-text">{formatPrice(breakdown.tax)}</span></div>
-              <div className="flex justify-between"><span className="text-muted">Shipping</span><span className={cn(breakdown.shipping === 0 && 'text-success')}>{breakdown.shipping === 0 ? 'FREE' : formatPrice(breakdown.shipping)}</span></div>
+              <div className="flex justify-between"><span className="text-muted">{t('common.subtotal')}</span><span className="text-text">{formatPrice(breakdown.subtotal)}</span></div>
+              <div className="flex justify-between"><span className="text-muted">{t('common.tax')}</span><span className="text-text">{formatPrice(breakdown.tax)}</span></div>
+              <div className="flex justify-between"><span className="text-muted">{t('common.shipping')}</span><span className={cn(breakdown.shipping === 0 && 'text-success')}>{breakdown.shipping === 0 ? t('common.free') : formatPrice(breakdown.shipping)}</span></div>
               <div className="flex justify-between border-t border-border pt-2">
-                <span className="text-text font-semibold">Total</span>
+                <span className="text-text font-semibold">{t('common.total')}</span>
                 <span className="text-xl font-bold text-gold">{formatPrice(breakdown.total)}</span>
               </div>
             </div>

@@ -1,9 +1,11 @@
 import { NextResponse } from 'next/server';
-import { supabase, isDatabaseConfigured } from '@/lib/db';
+import { supabase, isDatabaseConfigured, logDatabaseDiagnostics } from '@/lib/db';
 
 export const dynamic = 'force-dynamic';
 
 export async function GET() {
+  await logDatabaseDiagnostics();
+
   const checks: Record<string, { status: string; latency?: number }> = {
     server: { status: 'ok' },
   };

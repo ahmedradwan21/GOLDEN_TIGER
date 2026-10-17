@@ -3,18 +3,7 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import {
-  LayoutDashboard,
-  BarChart3,
-  Package,
-  ShoppingCart,
-  LogOut,
-  Menu,
-  X,
-  Store,
-  Crown,
-  Flame,
-} from 'lucide-react';
+import { LayoutDashboard, ChartBar as BarChart3, Package, ShoppingCart, LogOut, Menu, X, Store, Crown, Flame, MessageSquare, FileText, Briefcase } from 'lucide-react';
 import { useI18n } from '@/context/I18nContext';
 import { ThemeSwitcher } from '@/components/layout/ThemeSwitcher';
 import { LanguageSwitcher } from '@/components/layout/LanguageSwitcher';
@@ -40,6 +29,9 @@ export function AdminShell({
     { href: '/admin/orders', label: t('admin.nav.orders'), icon: ShoppingCart },
     { href: '/admin/loyalty', label: t('admin.nav.loyalty'), icon: Crown },
     { href: '/admin/campaigns', label: t('admin.nav.campaigns'), icon: Flame },
+    { href: '/admin/reviews', label: 'Reviews', icon: MessageSquare },
+    { href: '/admin/content', label: t('admin.nav.content'), icon: FileText },
+    { href: '/admin/careers', label: t('admin.nav.careers'), icon: Briefcase },
   ];
 
   async function handleLogout() {

@@ -476,6 +476,150 @@ export interface Database {
         };
         Relationships: [];
       };
+      product_reviews: {
+        Row: {
+          id: string;
+          product_id: string;
+          author_name: string;
+          rating: number;
+          comment: string;
+          is_approved: boolean;
+          admin_reply: string | null;
+          admin_replied_at: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          product_id: string;
+          author_name: string;
+          rating: number;
+          comment: string;
+          is_approved?: boolean;
+          admin_reply?: string | null;
+          admin_replied_at?: string | null;
+        };
+        Update: {
+          id?: string;
+          product_id?: string;
+          author_name?: string;
+          rating?: number;
+          comment?: string;
+          is_approved?: boolean;
+          admin_reply?: string | null;
+          admin_replied_at?: string | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'product_reviews_product_id_fkey';
+            columns: ['product_id'];
+            isOneToOne: false;
+            referencedRelation: 'products';
+            referencedColumns: ['id'];
+          }
+        ];
+      };
+      site_content: {
+        Row: {
+          id: string;
+          page_key: string;
+          title_en: string;
+          title_ar: string;
+          body_en: string;
+          body_ar: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          page_key: string;
+          title_en?: string;
+          title_ar?: string;
+          body_en?: string;
+          body_ar?: string;
+        };
+        Update: {
+          id?: string;
+          page_key?: string;
+          title_en?: string;
+          title_ar?: string;
+          body_en?: string;
+          body_ar?: string;
+        };
+        Relationships: [];
+      };
+      job_postings: {
+        Row: {
+          id: string;
+          title: string;
+          department: string;
+          location: string;
+          type: string;
+          description: string;
+          requirements: string | null;
+          is_active: boolean;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          title: string;
+          department: string;
+          location: string;
+          type?: string;
+          description: string;
+          requirements?: string | null;
+          is_active?: boolean;
+        };
+        Update: {
+          id?: string;
+          title?: string;
+          department?: string;
+          location?: string;
+          type?: string;
+          description?: string;
+          requirements?: string | null;
+          is_active?: boolean;
+        };
+        Relationships: [];
+      };
+      job_applications: {
+        Row: {
+          id: string;
+          job_id: string;
+          full_name: string;
+          email: string;
+          phone: string | null;
+          cover_letter: string | null;
+          resume_url: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          job_id: string;
+          full_name: string;
+          email: string;
+          phone?: string | null;
+          cover_letter?: string | null;
+          resume_url?: string | null;
+        };
+        Update: {
+          id?: string;
+          job_id?: string;
+          full_name?: string;
+          email?: string;
+          phone?: string | null;
+          cover_letter?: string | null;
+          resume_url?: string | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'job_applications_job_id_fkey';
+            columns: ['job_id'];
+            isOneToOne: false;
+            referencedRelation: 'job_postings';
+            referencedColumns: ['id'];
+          }
+        ];
+      };
     };
     Views: Record<never, never>;
     Functions: Record<never, never>;

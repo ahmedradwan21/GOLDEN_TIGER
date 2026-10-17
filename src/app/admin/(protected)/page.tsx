@@ -5,8 +5,9 @@ import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
 } from 'recharts';
 import { Card } from '@/components/ui/card';
-import { DollarSign, ShoppingCart, MousePointerClick, TrendingUp, Package, AlertTriangle, Loader2 } from 'lucide-react';
+import { DollarSign, ShoppingCart, MousePointerClick, TrendingUp, Package, TriangleAlert as AlertTriangle, Loader as Loader2 } from 'lucide-react';
 import { formatPrice } from '@/lib/pricing';
+import { useI18n } from '@/context/I18nContext';
 
 interface OverviewData {
   kpis: {
@@ -27,6 +28,7 @@ interface OverviewData {
 }
 
 export default function AdminOverviewPage() {
+  const { t } = useI18n();
   const [data, setData] = useState<OverviewData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -39,13 +41,13 @@ export default function AdminOverviewPage() {
         const json = await res.json();
         setData(json);
       } catch {
-        setError('Failed to load dashboard data');
+        setError(t('admin.overview.loadFailed'));
       } finally {
         setLoading(false);
       }
     }
     load();
-  }, []);
+  }, [t]);
 
   if (loading) {
     return (
@@ -58,7 +60,7 @@ export default function AdminOverviewPage() {
   if (error || !data) {
     return (
       <div className="text-center py-20">
-        <p className="text-danger">{error ?? 'No data available'}</p>
+        <p className="text-danger">{error ?? t('admin.overview.noData')}</p>
       </div>
     );
   }
@@ -75,39 +77,45 @@ export default function AdminOverviewPage() {
 
   const chartData = Object.values(revenueByDay).sort((a, b) => a.date.localeCompare(b.date));
 
+  const statusLabel = (status: string) => {
+    const key = `admin.orderStatus.${status.toLowerCase().replace(/_/g, '')}`;
+    const label = t(key);
+    return label === key ? status : label;
+  };
+
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="font-heading text-3xl font-bold">Dashboard Overview</h1>
-        <p className="text-muted mt-1">Key metrics from the last 30 days</p>
+        <h1 className="font-heading text-3xl font-bold">{t('admin.overview.title')}</h1>
+        <p className="text-muted mt-1">{t('admin.overview.subtitle')}</p>
       </div>
 
       {/* KPI Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <KPICard
-          label="Total Revenue"
+          label={t('admin.overview.totalRevenue')}
           value={formatPrice(kpis.totalRevenue)}
           icon={DollarSign}
           color="text-gold"
         />
         <KPICard
-          label="Total Orders"
+          label={t('admin.overview.totalOrders')}
           value={kpis.totalOrders.toString()}
-          subtext={`${kpis.completedOrders} completed`}
+          subtext={t('admin.overview.completedCount').replace('{count}', String(kpis.completedOrders))}
           icon={ShoppingCart}
           color="text-tiger-orange"
         />
         <KPICard
-          label="CTR"
+          label={t('admin.overview.ctr')}
           value={`${kpis.ctr}%`}
-          subtext={`${kpis.totalClicks} clicks / ${kpis.totalImpressions} impressions`}
+          subtext={t('admin.overview.ctrSubtext').replace('{clicks}', String(kpis.totalClicks)).replace('{impressions}', String(kpis.totalImpressions))}
           icon={MousePointerClick}
           color="text-green-400"
         />
         <KPICard
-          label="Conversion Rate"
+          label={t('admin.overview.conversionRate')}
           value={`${kpis.conversionRate}%`}
-          subtext={`${kpis.todayOrders} orders today`}
+          subtext={t('admin.overview.ordersToday').replace('{count}', String(kpis.todayOrders))}
           icon={TrendingUp}
           color="text-blue-400"
         />
@@ -115,25 +123,25 @@ export default function AdminOverviewPage() {
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <KPICard
-          label="Avg Order Value"
+          label={t('admin.overview.avgOrderValue')}
           value={formatPrice(kpis.avgOrderValue)}
           icon={DollarSign}
           color="text-gold"
         />
         <KPICard
-          label="Inventory Value"
+          label={t('admin.overview.inventoryValue')}
           value={formatPrice(kpis.inventoryValue)}
           icon={Package}
           color="text-tiger-orange"
         />
         <KPICard
-          label="Active Products"
+          label={t('admin.overview.activeProducts')}
           value={kpis.activeProducts.toString()}
           icon={Package}
           color="text-green-400"
         />
         <KPICard
-          label="Today's Orders"
+          label={t('admin.overview.todaysOrders')}
           value={kpis.todayOrders.toString()}
           icon={ShoppingCart}
           color="text-blue-400"
@@ -143,7 +151,7 @@ export default function AdminOverviewPage() {
       {/* Revenue chart */}
       {chartData.length > 0 && (
         <Card className="bg-surface border-border p-6">
-          <h2 className="font-heading text-xl font-bold mb-4">Revenue (Last 30 Days)</h2>
+          <h2 className="font-heading text-xl font-bold mb-4">{t('admin.overview.revenueChart')}</h2>
           <ResponsiveContainer width="100%" height={300}>
             <AreaChart data={chartData}>
               <defs>
@@ -158,7 +166,7 @@ export default function AdminOverviewPage() {
               <Tooltip
                 contentStyle={{ background: '#1D1D26', border: '1px solid #2A2A35', borderRadius: '8px' }}
                 labelStyle={{ color: '#F5F1E6' }}
-                formatter={(value: number) => [formatPrice(value), 'Revenue']}
+                formatter={(value: number) => [formatPrice(value), t('admin.overview.revenue')]}
               />
               <Area type="monotone" dataKey="revenue" stroke="#D4AF37" strokeWidth={2} fill="url(#revenueGrad)" />
             </AreaChart>
@@ -171,17 +179,17 @@ export default function AdminOverviewPage() {
         <Card className="bg-surface border-border p-6">
           <div className="flex items-center gap-2 mb-4">
             <AlertTriangle className="w-5 h-5 text-tiger-orange" />
-            <h2 className="font-heading text-xl font-bold">Low Stock Alerts</h2>
+            <h2 className="font-heading text-xl font-bold">{t('admin.overview.lowStockAlerts')}</h2>
           </div>
           {lowStockProducts.length === 0 ? (
-            <p className="text-muted text-sm">All products are well stocked.</p>
+            <p className="text-muted text-sm">{t('admin.overview.allStocked')}</p>
           ) : (
             <div className="space-y-2">
               {lowStockProducts.map((p) => (
                 <div key={p.id} className="flex items-center justify-between py-2 border-b border-border last:border-0">
                   <span className="text-sm text-text truncate">{p.title}</span>
                   <span className={`text-sm font-semibold ${p.stock === 0 ? 'text-danger' : 'text-tiger-orange'}`}>
-                    {p.stock === 0 ? 'Out of stock' : `${p.stock} left`}
+                    {p.stock === 0 ? t('admin.overview.outOfStock') : t('admin.overview.stockLeft').replace('{count}', String(p.stock))}
                   </span>
                 </div>
               ))}
@@ -191,9 +199,9 @@ export default function AdminOverviewPage() {
 
         {/* Recent orders */}
         <Card className="bg-surface border-border p-6">
-          <h2 className="font-heading text-xl font-bold mb-4">Recent Orders</h2>
+          <h2 className="font-heading text-xl font-bold mb-4">{t('admin.overview.recentOrders')}</h2>
           {recentOrders.length === 0 ? (
-            <p className="text-muted text-sm">No recent orders.</p>
+            <p className="text-muted text-sm">{t('admin.overview.noRecentOrders')}</p>
           ) : (
             <div className="space-y-2">
               {recentOrders.slice(0, 8).map((order) => (
@@ -205,7 +213,7 @@ export default function AdminOverviewPage() {
                       order.status === 'CHECKOUT_STARTED' ? 'bg-blue-500/20 text-blue-400' :
                       'bg-red-500/20 text-red-400'
                     }`}>
-                      {order.status}
+                      {statusLabel(order.status)}
                     </span>
                   </div>
                   <span className="text-sm font-semibold text-gold">{formatPrice(order.total_cents)}</span>

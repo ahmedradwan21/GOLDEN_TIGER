@@ -4,13 +4,15 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { toast } from 'sonner';
-import { Loader2, Mail, Lock, User } from 'lucide-react';
+import { Loader as Loader2, Mail, Lock, User } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
+import { useI18n } from '@/context/I18nContext';
 import { Logo } from '@/components/layout/Logo';
 
 export default function RegisterPage() {
   const router = useRouter();
   const { register } = useAuth();
+  const { t } = useI18n();
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -19,17 +21,17 @@ export default function RegisterPage() {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (password.length < 8) {
-      toast.error('Password must be at least 8 characters');
+      toast.error(t('auth.toast.passwordTooShort'));
       return;
     }
     setLoading(true);
     const result = await register(email, password, name || undefined);
     setLoading(false);
     if (result.success) {
-      toast.success('Account created! Welcome to The Golden Tiger.');
+      toast.success(t('auth.toast.accountCreated'));
       router.push('/account');
     } else {
-      toast.error(result.error ?? 'Registration failed');
+      toast.error(result.error ?? t('auth.toast.registerFailed'));
     }
   }
 
@@ -40,12 +42,12 @@ export default function RegisterPage() {
           <Logo showTagline />
         </div>
         <div className="bg-surface rounded-xl border border-border p-6 sm:p-8">
-          <h1 className="font-heading text-2xl font-bold text-text mb-1">Create Account</h1>
-          <p className="text-sm text-muted mb-6">Join The Golden Tiger for a premium shopping experience.</p>
+          <h1 className="font-heading text-2xl font-bold text-text mb-1">{t('register.title')}</h1>
+          <p className="text-sm text-muted mb-6">{t('register.subtitle')}</p>
 
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
-              <label className="block text-xs font-medium text-muted mb-1.5">Name (optional)</label>
+              <label className="block text-xs font-medium text-muted mb-1.5">{t('register.nameOptional')}</label>
               <div className="relative">
                 <User className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted" />
                 <input
@@ -59,7 +61,7 @@ export default function RegisterPage() {
               </div>
             </div>
             <div>
-              <label className="block text-xs font-medium text-muted mb-1.5">Email</label>
+              <label className="block text-xs font-medium text-muted mb-1.5">{t('common.email')}</label>
               <div className="relative">
                 <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted" />
                 <input
@@ -74,7 +76,7 @@ export default function RegisterPage() {
               </div>
             </div>
             <div>
-              <label className="block text-xs font-medium text-muted mb-1.5">Password (min 8 characters)</label>
+              <label className="block text-xs font-medium text-muted mb-1.5">{t('register.passwordLabel')}</label>
               <div className="relative">
                 <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted" />
                 <input
@@ -83,7 +85,7 @@ export default function RegisterPage() {
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   className="w-full h-10 pl-10 pr-3 rounded-lg bg-surface-elevated border border-border text-sm text-text placeholder:text-muted focus-ring"
-                  placeholder="Create a password"
+                  placeholder="••••••••"
                   autoComplete="new-password"
                 />
               </div>
@@ -93,14 +95,14 @@ export default function RegisterPage() {
               disabled={loading}
               className="w-full h-12 gold-button rounded-lg text-sm font-semibold flex items-center justify-center gap-2"
             >
-              {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Create Account'}
+              {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : t('register.createAccount')}
             </button>
           </form>
 
           <p className="text-sm text-muted text-center mt-6">
-            Already have an account?{' '}
+            {t('register.haveAccount')}{' '}
             <Link href="/login" className="text-gold hover:text-gold-light transition-colors font-medium">
-              Sign in
+              {t('register.signIn')}
             </Link>
           </p>
         </div>

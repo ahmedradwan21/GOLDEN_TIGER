@@ -34,7 +34,9 @@ export async function POST(req: NextRequest) {
 
     await createSessionCookie(user.id, user.email);
     return NextResponse.json({ id: user.id, email: user.email, name: user.name });
-  } catch {
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    console.error('[auth/login] Error:', msg);
     return NextResponse.json({ error: 'Something went wrong. Please try again.' }, { status: 500 });
   }
 }

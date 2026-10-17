@@ -31,10 +31,10 @@ export function Footer() {
     {
       title: t('footer.about'),
       links: [
-        { label: t('footer.ourStory'), href: '#' },
-        { label: t('footer.careers'), href: '#' },
-        { label: t('footer.privacyPolicy'), href: '#' },
-        { label: t('footer.termsOfService'), href: '#' },
+        { label: t('footer.ourStory'), href: '/our-story' },
+        { label: t('footer.careers'), href: '/careers' },
+        { label: t('footer.privacyPolicy'), href: '/privacy' },
+        { label: t('footer.termsOfService'), href: '/terms' },
       ],
     },
   ];

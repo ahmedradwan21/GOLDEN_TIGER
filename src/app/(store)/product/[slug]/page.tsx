@@ -15,6 +15,7 @@ import { ProductTabs } from '@/components/product/ProductTabs';
 import { ProductSlider } from '@/components/product/ProductSlider';
 import { RecentlyViewed } from '@/components/product/RecentlyViewed';
 import { LoyaltyRewards } from '@/components/product/LoyaltyRewards';
+import { ProductReviews } from '@/components/product/ProductReviews';
 import type { Product } from '@/types';
 
 export const revalidate = 300;
@@ -122,6 +123,11 @@ export default async function ProductPage({ params }: ProductPageProps) {
           seeAllHref={category ? `/category/${category.slug}` : undefined}
         />
       )}
+
+      {/* Customer Reviews */}
+      <div className="mb-10">
+        <ProductReviews productId={product.id} />
+      </div>
 
       {/* Recently viewed */}
       <RecentlyViewed currentProductId={product.id} allProducts={allProducts} />

@@ -61,7 +61,9 @@ export async function POST(req: NextRequest) {
 
     await createAdminCookie(admin.id, admin.email, admin.role);
     return NextResponse.json({ id: admin.id, email: admin.email, name: admin.name, role: admin.role });
-  } catch {
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    console.error('[admin/auth/login] Error:', msg);
     return NextResponse.json({ error: 'Something went wrong' }, { status: 500 });
   }
 }

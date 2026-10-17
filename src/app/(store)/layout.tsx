@@ -4,12 +4,14 @@ import { MiniCart } from '@/components/layout/MiniCart';
 import { TelemetryProvider } from '@/components/layout/TelemetryProvider';
 import { CampaignBanner } from '@/components/home/CampaignBanner';
 import { getCategoryTree } from '@/lib/data/products';
+import { logDatabaseDiagnostics } from '@/lib/db';
 
 export default async function StoreLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
+  void logDatabaseDiagnostics();
   const categories = await getCategoryTree();
 
   return (

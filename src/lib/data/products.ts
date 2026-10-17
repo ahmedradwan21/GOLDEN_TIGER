@@ -13,7 +13,8 @@ export async function getCategoryTree(): Promise<Category[]> {
     .select('*')
     .order('sort_order', { ascending: true });
 
-  if (error || !data) return [];
+  if (error) { console.error('[getCategoryTree] Supabase error:', error.message); return []; }
+  if (!data) return [];
   const rows = data as CategoryRow[];
   const roots = rows.filter((c) => !c.parent_id);
   return roots.map((r) => mapCategoryRow(r, rows));
@@ -29,7 +30,8 @@ export async function getCategoryBySlug(slug: string): Promise<Category | null> 
     .eq('slug', slug)
     .maybeSingle();
 
-  if (error || !data) return null;
+  if (error) { console.error('[getCategoryBySlug] Supabase error:', error.message); return null; }
+  if (!data) return null;
   const cat = data as CategoryRow;
 
   const { data: allCats } = await supabase
@@ -52,7 +54,8 @@ export async function getFeaturedProducts(): Promise<Product[]> {
     .order('rating', { ascending: false })
     .limit(8);
 
-  if (error || !data) return [];
+  if (error) { console.error('[getFeaturedProducts] Supabase error:', error.message); return []; }
+  if (!data) return [];
   return (data as ProductRow[]).map(mapProductRow);
 }
 
@@ -83,7 +86,8 @@ export async function getProductsByCategory(slug: string): Promise<Product[]> {
     .order('ad_priority', { ascending: false })
     .order('created_at', { ascending: true });
 
-  if (error || !data) return [];
+  if (error) { console.error('[getProductsByCategory] Supabase error:', error.message); return []; }
+  if (!data) return [];
   return (data as ProductRow[]).map(mapProductRow);
 }
 
@@ -97,7 +101,8 @@ export async function getProductBySlug(slug: string): Promise<Product | null> {
     .eq('slug', slug)
     .maybeSingle();
 
-  if (error || !data) return null;
+  if (error) { console.error('[getProductBySlug] Supabase error:', error.message); return null; }
+  if (!data) return null;
   return mapProductRow(data as ProductRow);
 }
 
@@ -121,7 +126,8 @@ export async function getRelatedProducts(productId: string): Promise<Product[]> 
     .order('rating', { ascending: false })
     .limit(8);
 
-  if (error || !data) return [];
+  if (error) { console.error('[getRelatedProducts] Supabase error:', error.message); return []; }
+  if (!data) return [];
   return (data as ProductRow[]).map(mapProductRow);
 }
 
@@ -209,7 +215,8 @@ export async function getAllProductSlugs(): Promise<string[]> {
     .select('slug')
     .eq('is_published', true);
 
-  if (error || !data) return [];
+  if (error) { console.error('[getAllProductSlugs] Supabase error:', error.message); return []; }
+  if (!data) return [];
   return (data as { slug: string }[]).map((p) => p.slug);
 }
 
@@ -225,6 +232,7 @@ export async function getDealsOfTheDay(): Promise<Product[]> {
     .order('rating', { ascending: false })
     .limit(8);
 
-  if (error || !data) return [];
+  if (error) { console.error('[getDealsOfTheDay] Supabase error:', error.message); return []; }
+  if (!data) return [];
   return (data as ProductRow[]).map(mapProductRow);
 }
