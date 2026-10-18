@@ -1,4 +1,4 @@
-﻿
+
 -- FILE: 20261014112657_create_users_table.sql
 /*
 # Create users table
