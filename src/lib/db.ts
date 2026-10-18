@@ -6,15 +6,19 @@ const globalForSupabase = globalThis as unknown as {
 	__diagnosticsLogged: boolean | undefined;
 };
 
-// الروابط المصلحة والمشفرة 100% لمشروعك الشخصي الحقيقي الملك لك بالكامل
-const supabaseUrl = "https://supabase.co";
-const supabaseAnonKey = "sb_publishable_l9DBN1Veuw4WGTAD29KROQ_oL5e8Lhs";
+// القيم بتتقرأ من ملف .env.local
+// لازم تتكتب بالشكل ده بالظبط (process.env.NEXT_PUBLIC_...) عشان Next.js يقرأها
+export const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "";
+export const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? "";
+
+export function isDatabaseConfigured(): boolean {
+	return supabaseUrl.startsWith("https://") && supabaseAnonKey.length > 0;
+}
 
 function createSupabaseClient(): SupabaseClient<Database> {
-	// تفعيل وضع المطور لطباعة التهيئة في الـ Terminal فقط
-	if (process.env.NODE_ENV === "development") {
-		console.log(
-			`\x1b[36m[TIGER DEV] جاري تهيئة العميل السحابي لـ Supabase للمشروع: oirhaemoefjkqbfxhgqb\x1b[0m`,
+	if (!isDatabaseConfigured()) {
+		throw new Error(
+			"Database not configured. Set NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY in .env.local, then restart the dev server.",
 		);
 	}
 	return createClient<Database>(supabaseUrl, supabaseAnonKey, {
@@ -22,31 +26,27 @@ function createSupabaseClient(): SupabaseClient<Database> {
 	});
 }
 
-export function isDatabaseConfigured(): boolean {
-	return true;
-}
-
 export const supabase: SupabaseClient<Database> =
 	globalForSupabase.supabase ??
 	(globalForSupabase.supabase = createSupabaseClient());
 
-/**
- * محرك الفحص التشخيصي المتقدم ومعالجة الأخطاء الذكية
- * يفصل تلقائياً بين ما يراه المطور وما يظهر للعميل لحماية سرية البيانات
- */
+export function handleDatabaseError(err: unknown, context: string): void {
+	const message = err instanceof Error ? err.message : String(err);
+	const stack = err instanceof Error ? err.stack : undefined;
+	console.error(`\x1b[31m[DB ERROR] ${context}: ${message}\x1b[0m`);
+	if (stack) {
+		console.error(`\x1b[31m${stack}\x1b[0m`);
+	}
+}
+
 export async function logDatabaseDiagnostics(): Promise<void> {
 	if (globalForSupabase.__diagnosticsLogged) return;
 	globalForSupabase.__diagnosticsLogged = true;
 
-	const isDev = process.env.NODE_ENV === "development";
 	const banner = "═══════════════════════════════════════════════════════════";
-
-	if (isDev) {
-		console.log(`\n${banner}`);
-		console.log(" 🐯 TIGER SYSTEM CONTROLLER — MODE: DEVELOPMENT 🐯");
-		console.log(banner);
-		console.log(`  🔍 فحص جدار الحماية والربط المباشر لـ: ${supabaseUrl}`);
-	}
+	console.log(`\n${banner}`);
+	console.log(" 🐯 TIGER SYSTEM CONTROLLER — MODE: DEVELOPMENT 🐯");
+	console.log(banner);
 
 	try {
 		const { count, error } = await supabase
@@ -54,25 +54,18 @@ export async function logDatabaseDiagnostics(): Promise<void> {
 			.select("id", { count: "exact", head: true });
 
 		if (error) {
-			if (isDev) {
-				console.error(
-					`\x1b[31m  ❌ [DEV ERROR] فشل الاتصال بالجداول السحابية: ${error.message}\x1b[0m`,
-				);
-			}
+			console.error(
+				`\x1b[31m  ❌ [DEV ERROR] فشل الاتصال بالجداول السحابية: ${error.message}\x1b[0m`,
+			);
 		} else {
-			const n = count ?? 0;
-			if (isDev) {
-				console.log(
-					`\x1b[32m  ✅ [DEV SUCCESS] الاتصال مستقر! تم العثور على ${n} منتجاً حياً داخل قاعدة البيانات.\x1b[0m`,
-				);
-			}
+			console.log(
+				`\x1b[32m  ✅ [DEV SUCCESS] الاتصال مستقر! تم العثور على ${count ?? 0} منتجاً حياً.\x1b[0m`,
+			);
 		}
 	} catch (err) {
-		if (isDev) {
-			const msg = err instanceof Error ? err.message : String(err);
-			console.error(`\x1b[31m  ❌ [CRITICAL SYSTEM CRASH]: ${msg}\x1b[0m`);
-		}
+		console.error(
+			`\x1b[31m  ❌ [CRITICAL SYSTEM CRASH]: ${err instanceof Error ? err.message : err}\x1b[0m`,
+		);
 	}
-
-	if (isDev) console.log(`${banner}\n`);
+	console.log(`${banner}\n`);
 }
