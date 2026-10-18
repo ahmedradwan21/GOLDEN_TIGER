@@ -1,15 +1,14 @@
 'use client';
 
 import Link from 'next/link';
-import { useState, useRef, useEffect } from 'react';
-import { ShoppingCart, Zap } from 'lucide-react';
+import { useState, useRef, useEffect, useCallback } from 'react';
+import { ShoppingCart, Zap, ChevronLeft, ChevronRight, Flame, Truck, Star } from 'lucide-react';
 import { SafeImage } from '@/components/ui/SafeImage';
 import { Rating } from '@/components/ui/Rating';
 import { PriceTag } from '@/components/ui/PriceTag';
 import { useCart } from '@/context/CartContext';
 import { useI18n } from '@/context/I18nContext';
-import { productToSnapshot, getStockHint } from '@/lib/utils';
-import { cn } from '@/lib/utils';
+import { productToSnapshot, getStockHint, discountPercent, cn } from '@/lib/utils';
 import { track } from '@/lib/tracker';
 import type { Product } from '@/types';
 
@@ -21,6 +20,14 @@ interface ProductCardProps {
   onSelect?: (product: Product) => void;
   className?: string;
 }
+
+const TICKER_MESSAGES = [
+  { icon: Truck, text: '🚚 توصيل مجاني' },
+  { icon: Star, text: '⭐ #1 في الفئة' },
+  { icon: Flame, text: '🔥 تم بيع +1500 مؤخراً' },
+];
+
+const BADGE_LABELS = ['الأكثر مبيعاً', 'أفضل المنتجات'];
 
 export function ProductCard({
   product,
@@ -34,8 +41,38 @@ export function ProductCard({
   const { addItem } = useCart();
   const [hovered, setHovered] = useState(false);
   const [adding, setAdding] = useState(false);
+  const [imageIndex, setImageIndex] = useState(0);
+  const [tickerIndex, setTickerIndex] = useState(0);
   const ref = useRef<HTMLDivElement>(null);
   const visibleFired = useRef(false);
+
+  const images = product.images.length > 0 ? product.images : [''];
+  const outOfStock = product.stock === 0;
+  const stockHint = getStockHint(product.stock);
+  const discount = discountPercent(product.price, product.compareAtPrice);
+
+  const nextImage = useCallback(() => {
+    setImageIndex((i) => (i + 1) % images.length);
+  }, [images.length]);
+
+  const prevImage = useCallback(() => {
+    setImageIndex((i) => (i - 1 + images.length) % images.length);
+  }, [images.length]);
+
+  // Auto-fading image slideshow every 3 seconds
+  useEffect(() => {
+    if (images.length <= 1) return;
+    const timer = setInterval(nextImage, 3000);
+    return () => clearInterval(timer);
+  }, [nextImage, images.length]);
+
+  // Vertical text ticker cycling every 2.5 seconds
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setTickerIndex((i) => (i + 1) % TICKER_MESSAGES.length);
+    }, 2500);
+    return () => clearInterval(timer);
+  }, []);
 
   useEffect(() => {
     if (!onVisible || visibleFired.current) return;
@@ -51,10 +88,7 @@ export function ProductCard({
     );
     if (ref.current) observer.observe(ref.current);
     return () => observer.disconnect();
-  }, [onVisible, product]);
-
-  const outOfStock = product.stock === 0;
-  const stockHint = getStockHint(product.stock);
+  }, [onVisible, product, sponsored, source]);
 
   const handleAddToCart = (e: React.MouseEvent) => {
     e.preventDefault();
@@ -67,6 +101,16 @@ export function ProductCard({
     onSelect?.(product);
   };
 
+  const handleImageNav = (e: React.MouseEvent, direction: 'prev' | 'next') => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (direction === 'prev') prevImage();
+    else nextImage();
+  };
+
+  const badgeLabel = sponsored ? BADGE_LABELS[0] : product.tags.includes('bestseller') ? BADGE_LABELS[0] : BADGE_LABELS[1];
+  const CurrentTickerIcon = TICKER_MESSAGES[tickerIndex].icon;
+
   return (
     <div
       ref={ref}
@@ -78,14 +122,27 @@ export function ProductCard({
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
     >
-      {sponsored && (
-        <span className={cn('absolute top-2 z-10 bg-gold/20 text-gold text-[0.625rem] font-semibold px-2 py-0.5 rounded-full backdrop-blur-sm', dir === 'rtl' ? 'right-2' : 'left-2')}>
-          {t('home.sponsored')}
+      {/* Status badges */}
+      <div className={cn('absolute top-2 z-20 flex flex-col gap-1', dir === 'rtl' ? 'right-2' : 'left-2')}>
+        <span className="bg-tiger-orange text-white text-[0.625rem] font-semibold px-2 py-0.5 rounded-full backdrop-blur-sm">
+          {badgeLabel}
+        </span>
+        {sponsored && (
+          <span className="bg-gold/20 text-gold text-[0.625rem] font-semibold px-2 py-0.5 rounded-full backdrop-blur-sm">
+            {t('home.sponsored')}
+          </span>
+        )}
+      </div>
+      {outOfStock && (
+        <span className={cn('absolute top-2 z-20 bg-danger/20 text-danger text-[0.625rem] font-semibold px-2 py-0.5 rounded-full backdrop-blur-sm', dir === 'rtl' ? 'left-2' : 'right-2')}>
+          {t('product.outOfStock')}
         </span>
       )}
-      {outOfStock && (
-        <span className={cn('absolute top-2 z-10 bg-danger/20 text-danger text-[0.625rem] font-semibold px-2 py-0.5 rounded-full backdrop-blur-sm', dir === 'rtl' ? 'left-2' : 'right-2')}>
-          {t('product.outOfStock')}
+
+      {/* Discount badge */}
+      {discount !== null && (
+        <span className={cn('absolute z-20 bg-success/90 text-white text-xs font-bold px-2 py-0.5 rounded-full backdrop-blur-sm', dir === 'rtl' ? 'left-2 top-9' : 'right-2 top-9')}>
+          -{discount}%
         </span>
       )}
 
@@ -99,16 +156,67 @@ export function ProductCard({
         aria-label={sponsored ? `${t('home.sponsored')}: ${product.title}` : product.title}
       >
         <div className="relative aspect-square overflow-hidden bg-surface-elevated">
-          <SafeImage
-            src={hovered && product.images[1] ? product.images[1] : product.images[0]}
-            alt={product.title}
-            fill
-            sizes="(max-width: 768px) 50vw, (max-width: 1024px) 33vw, 20vw"
-            className={cn(
-              'object-cover transition-transform duration-500',
-              hovered ? 'scale-110' : 'scale-100'
-            )}
-          />
+          {images.map((img, idx) => (
+            <div
+              key={idx}
+              className={cn(
+                'absolute inset-0 transition-opacity duration-700',
+                idx === imageIndex ? 'opacity-100' : 'opacity-0'
+              )}
+            >
+              <SafeImage
+                src={img}
+                alt={product.title}
+                fill
+                sizes="(max-width: 768px) 50vw, (max-width: 1024px) 33vw, 20vw"
+                className={cn(
+                  'object-cover transition-transform duration-500',
+                  hovered && idx === imageIndex ? 'scale-110' : 'scale-100'
+                )}
+              />
+            </div>
+          ))}
+
+          {/* Hover navigation arrows */}
+          {images.length > 1 && (
+            <>
+              <button
+                onClick={(e) => handleImageNav(e, 'prev')}
+                className={cn(
+                  'absolute top-1/2 -translate-y-1/2 h-8 w-8 rounded-full bg-surface/80 backdrop-blur-sm flex items-center justify-center text-text opacity-0 group-hover:opacity-100 transition-opacity hover:bg-surface hover:text-gold',
+                  dir === 'rtl' ? 'right-2' : 'left-2'
+                )}
+                aria-label="السابق"
+              >
+                <ChevronLeft className="h-4 w-4" />
+              </button>
+              <button
+                onClick={(e) => handleImageNav(e, 'next')}
+                className={cn(
+                  'absolute top-1/2 -translate-y-1/2 h-8 w-8 rounded-full bg-surface/80 backdrop-blur-sm flex items-center justify-center text-text opacity-0 group-hover:opacity-100 transition-opacity hover:bg-surface hover:text-gold',
+                  dir === 'rtl' ? 'left-2' : 'right-2'
+                )}
+                aria-label="التالي"
+              >
+                <ChevronRight className="h-4 w-4" />
+              </button>
+            </>
+          )}
+
+          {/* Image indicator dots */}
+          {images.length > 1 && (
+            <div className="absolute bottom-2 left-1/2 -translate-x-1/2 flex gap-1">
+              {images.map((_, idx) => (
+                <span
+                  key={idx}
+                  className={cn(
+                    'h-1 rounded-full transition-all',
+                    idx === imageIndex ? 'w-4 bg-gold' : 'w-1 bg-muted/50'
+                  )}
+                />
+              ))}
+            </div>
+          )}
         </div>
       </Link>
 
@@ -129,6 +237,18 @@ export function ProductCard({
           compareAtPrice={product.compareAtPrice}
           size="sm"
         />
+
+        {/* Vertical text ticker */}
+        <div className="relative h-5 overflow-hidden bg-surface-elevated rounded-md px-2">
+          <div
+            key={tickerIndex}
+            className="flex items-center gap-1 text-[0.625rem] text-tiger-orange font-medium animate-fade-in"
+          >
+            <CurrentTickerIcon className="h-3 w-3 shrink-0" />
+            <span>{TICKER_MESSAGES[tickerIndex].text}</span>
+          </div>
+        </div>
+
         {stockHint && stockHint !== t('product.outOfStock') && (
           <p className="text-xs text-amber-500 font-medium">{stockHint}</p>
         )}

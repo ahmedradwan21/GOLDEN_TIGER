@@ -620,6 +620,47 @@ export interface Database {
           }
         ];
       };
+      browsing_history: {
+        Row: {
+          id: string;
+          session_id: string;
+          product_id: string | null;
+          product_slug: string;
+          product_title: string;
+          product_image: string | null;
+          product_price: number | null;
+          viewed_at: string;
+        };
+        Insert: {
+          id?: string;
+          session_id: string;
+          product_id?: string | null;
+          product_slug: string;
+          product_title: string;
+          product_image?: string | null;
+          product_price?: number | null;
+          viewed_at?: string;
+        };
+        Update: {
+          id?: string;
+          session_id?: string;
+          product_id?: string | null;
+          product_slug?: string;
+          product_title?: string;
+          product_image?: string | null;
+          product_price?: number | null;
+          viewed_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'browsing_history_product_id_fkey';
+            columns: ['product_id'];
+            isOneToOne: false;
+            referencedRelation: 'products';
+            referencedColumns: ['id'];
+          }
+        ];
+      };
     };
     Views: Record<never, never>;
     Functions: Record<never, never>;

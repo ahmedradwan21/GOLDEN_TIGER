@@ -3,6 +3,7 @@ import { Footer } from '@/components/layout/Footer';
 import { MiniCart } from '@/components/layout/MiniCart';
 import { TelemetryProvider } from '@/components/layout/TelemetryProvider';
 import { CampaignBanner } from '@/components/home/CampaignBanner';
+import { BrowsingHistory } from '@/components/BrowsingHistory';
 import { getCategoryTree } from '@/lib/data/products';
 import { logDatabaseDiagnostics } from '@/lib/db';
 
@@ -20,6 +21,7 @@ export default async function StoreLayout({
         <CampaignBanner />
         <Header categories={categories} />
         <main className="flex-1">{children}</main>
+        <BrowsingHistory />
         <Footer />
         <MiniCart />
       </TelemetryProvider>

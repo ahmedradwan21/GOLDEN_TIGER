@@ -1,4 +1,9 @@
-import { HeroCarousel } from '@/components/home/HeroCarousel';
+import { HeroSlider } from '@/components/HeroSlider';
+import { MarketingBanner } from '@/components/MarketingBanner';
+import { CouponSection } from '@/components/CouponSection';
+import { BrandsHub } from '@/components/BrandsHub';
+import { CategoryFeatureGrid } from '@/components/CategoryFeatureGrid';
+import { BrowsingHistory } from '@/components/BrowsingHistory';
 import { CategoryTiles } from '@/components/home/CategoryTiles';
 import { CategorySlider } from '@/components/home/CategorySlider';
 import { DealsOfTheDay } from '@/components/home/DealsOfTheDay';
@@ -8,13 +13,15 @@ import {
   getCategoryTree,
   getProductsByCategory,
   getDealsOfTheDay,
+  getHomepageRelatedProducts,
 } from '@/lib/data/products';
 
 export default async function HomePage() {
-  const [slides, categories, deals] = await Promise.all([
+  const [slides, categories, deals, relatedProducts] = await Promise.all([
     getHeroSlides(),
     getCategoryTree(),
     getDealsOfTheDay(),
+    getHomepageRelatedProducts(),
   ]);
 
   const productsByCategory = await Promise.all(
@@ -24,10 +31,21 @@ export default async function HomePage() {
     }))
   );
 
+  const allProducts = productsByCategory.flatMap(({ products }) => products);
+
   return (
     <div>
-      <HeroCarousel slides={slides} />
+      <HeroSlider slides={slides} />
       <CategoryTiles categories={categories} />
+
+      <MarketingBanner />
+
+      <CategoryFeatureGrid categories={categories} products={allProducts} />
+
+      <BrandsHub />
+
+      <CouponSection />
+
       {productsByCategory.map(({ category, products }) =>
         products.length > 0 ? (
           <CategorySlider
@@ -40,6 +58,9 @@ export default async function HomePage() {
         ) : null
       )}
       <DealsOfTheDay products={deals} />
+
+      <BrowsingHistory relatedProducts={relatedProducts} />
+
       <Newsletter />
     </div>
   );

@@ -206,6 +206,22 @@ export async function getHeroSlides(): Promise<HeroSlide[]> {
   }
 }
 
+export async function getHomepageRelatedProducts(): Promise<Product[]> {
+  if (!isDatabaseConfigured()) return [];
+  ensureDatabaseConfigured();
+
+  const { data, error } = await supabase
+    .from('products')
+    .select('*')
+    .eq('is_published', true)
+    .order('rating', { ascending: false })
+    .limit(12);
+
+  if (error) { console.error('[getHomepageRelatedProducts] Supabase error:', error.message); return []; }
+  if (!data) return [];
+  return (data as ProductRow[]).map(mapProductRow);
+}
+
 export async function getAllProductSlugs(): Promise<string[]> {
   if (!isDatabaseConfigured()) return [];
   ensureDatabaseConfigured();
