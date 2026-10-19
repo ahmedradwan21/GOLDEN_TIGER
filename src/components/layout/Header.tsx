@@ -68,11 +68,6 @@ export function Header({ categories }: HeaderProps) {
   return (
     <>
       <header className="sticky top-0 z-40 bg-surface/95 backdrop-blur-md border-b border-border">
-        {/* Top bar */}
-        <div className="bg-background/80 text-center py-1.5 text-xs text-muted border-b border-border">
-          <p>{t('topbar.freeship')} &nbsp;|&nbsp; {t('topbar.returns')} &nbsp;|&nbsp; {t('topbar.secure')}</p>
-        </div>
-
         {/* Main header */}
         <div className="max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8">
           <div className={cn('flex items-center justify-between h-16 gap-4', dir === 'rtl' && 'flex-row-reverse')}>

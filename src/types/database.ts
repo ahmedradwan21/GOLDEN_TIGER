@@ -661,6 +661,45 @@ export interface Database {
           }
         ];
       };
+      announcement_bar_settings: {
+        Row: {
+          id: string;
+          is_enabled: boolean;
+          message_en: string;
+          message_ar: string;
+          link_url: string | null;
+          background_color: string;
+          text_color: string;
+          starts_at: string | null;
+          ends_at: string | null;
+          updated_at: string;
+        };
+        Insert: {
+          id: string;
+          is_enabled?: boolean;
+          message_en?: string;
+          message_ar?: string;
+          link_url?: string | null;
+          background_color?: string;
+          text_color?: string;
+          starts_at?: string | null;
+          ends_at?: string | null;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          is_enabled?: boolean;
+          message_en?: string;
+          message_ar?: string;
+          link_url?: string | null;
+          background_color?: string;
+          text_color?: string;
+          starts_at?: string | null;
+          ends_at?: string | null;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
     };
     Views: Record<never, never>;
     Functions: Record<never, never>;
