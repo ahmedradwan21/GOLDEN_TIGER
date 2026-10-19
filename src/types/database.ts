@@ -700,6 +700,44 @@ export interface Database {
         };
         Relationships: [];
       };
+      social_community_links: {
+        Row: {
+          id: string;
+          platform: string;
+          name_en: string;
+          name_ar: string;
+          description_en: string;
+          description_ar: string;
+          url: string;
+          is_visible: boolean;
+          sort_order: number;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          platform: string;
+          name_en: string;
+          name_ar: string;
+          description_en?: string;
+          description_ar?: string;
+          url: string;
+          is_visible?: boolean;
+          sort_order?: number;
+        };
+        Update: {
+          id?: string;
+          platform?: string;
+          name_en?: string;
+          name_ar?: string;
+          description_en?: string;
+          description_ar?: string;
+          url?: string;
+          is_visible?: boolean;
+          sort_order?: number;
+        };
+        Relationships: [];
+      };
     };
     Views: Record<never, never>;
     Functions: Record<never, never>;

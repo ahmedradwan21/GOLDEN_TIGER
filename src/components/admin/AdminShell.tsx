@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { LayoutDashboard, ChartBar as BarChart3, Package, ShoppingCart, LogOut, Menu, X, Store, Crown, Flame, MessageSquare, FileText, Briefcase, Megaphone } from 'lucide-react';
+import { LayoutDashboard, ChartBar as BarChart3, Package, ShoppingCart, LogOut, Menu, X, Store, Crown, Flame, MessageSquare, FileText, Briefcase, Megaphone, Share2 } from 'lucide-react';
 import { useI18n } from '@/context/I18nContext';
 import { ThemeSwitcher } from '@/components/layout/ThemeSwitcher';
 import { LanguageSwitcher } from '@/components/layout/LanguageSwitcher';
@@ -33,6 +33,7 @@ export function AdminShell({
     { href: '/admin/content', label: t('admin.nav.content'), icon: FileText },
     { href: '/admin/careers', label: t('admin.nav.careers'), icon: Briefcase },
     { href: '/admin/announcement', label: dir === 'rtl' ? 'الإعلان العلوي' : 'Announcement Bar', icon: Megaphone },
+    { href: '/admin/community', label: dir === 'rtl' ? 'قنوات التواصل' : 'Community Channels', icon: Share2 },
   ];
 
   async function handleLogout() {

@@ -153,13 +153,13 @@ export function CouponSection({ coupons = defaultCoupons, className }: CouponSec
         ))}
 
         <Link
-          href="/#coupons"
+          href="/community"
           className="group relative shrink-0 w-64 bg-danger rounded-xl overflow-hidden flex flex-col items-center justify-center hover:opacity-90 transition-opacity"
         >
           <div className="p-8 text-center text-white">
             <ArrowLeft className="h-10 w-10 mx-auto mb-3 group-hover:translate-x-2 transition-transform" />
-            <p className="text-base font-bold">شوف كل الكوبونات</p>
-            <p className="mt-1 text-xs opacity-80">اكتشف كل العروض المتاحة</p>
+            <p className="text-base font-bold">تواصل معنا</p>
+            <p className="mt-1 text-xs opacity-80">انضم لمجتمعنا واحصل على العروض</p>
           </div>
         </Link>
       </div>
