@@ -30,6 +30,18 @@ export const supabase: SupabaseClient<Database> =
 	globalForSupabase.supabase ??
 	(globalForSupabase.supabase = createSupabaseClient());
 
+// Service-role client for server-side admin operations (bypasses RLS).
+// The service role key is NOT exposed to the browser (no NEXT_PUBLIC_ prefix),
+// so on the client this falls back to the anon key harmlessly. Admin API routes
+// run server-side only, where the real key is present.
+const supabaseServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY ?? "";
+
+export const supabaseAdmin: SupabaseClient<Database> = createClient<Database>(
+	supabaseUrl,
+	supabaseServiceRoleKey || supabaseAnonKey,
+	{ auth: { persistSession: false, autoRefreshToken: false } },
+);
+
 export function handleDatabaseError(err: unknown, context: string): void {
 	const message = err instanceof Error ? err.message : String(err);
 	const stack = err instanceof Error ? err.stack : undefined;
