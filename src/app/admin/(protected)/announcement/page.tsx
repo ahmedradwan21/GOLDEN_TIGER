@@ -7,7 +7,6 @@ import { useI18n } from '@/context/I18nContext';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
-import { supabase } from '@/lib/db';
 import { cn } from '@/lib/utils';
 import type { Database } from '@/types/database';
 
@@ -49,18 +48,15 @@ export default function AdminAnnouncementPage() {
   const loadSettings = useCallback(async () => {
     setLoading(true);
     try {
-      const { data, error: loadError } = await supabase
-        .from('announcement_bar_settings')
-        .select('*')
-        .eq('id', 'main')
-        .maybeSingle();
-
-      if (loadError) {
-        setError(loadError.message);
+      const res = await fetch('/api/admin/announcement', { cache: 'no-store' });
+      if (!res.ok) {
+        const data = await res.json().catch(() => null);
+        setError(data?.error ?? 'Failed to load settings');
         return;
       }
 
-      const row: AnnouncementBarRow | null = data;
+      const payload = await res.json();
+      const row: AnnouncementBarRow | null = payload.settings ?? null;
       if (row) {
         setIsEnabled(row.is_enabled);
         setMessageEn(row.message_en ?? '');
@@ -95,17 +91,19 @@ export default function AdminAnnouncementPage() {
         text_color: textColor,
         starts_at: fromDatetimeLocal(startsAt),
         ends_at: fromDatetimeLocal(endsAt),
-        updated_at: new Date().toISOString(),
       };
 
-      const { error: updateError } = await supabase
-        .from('announcement_bar_settings')
-        .update(payload)
-        .eq('id', 'main');
+      const res = await fetch('/api/admin/announcement', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
 
-      if (updateError) {
-        setError(updateError.message);
-        toast.error(updateError.message);
+      if (!res.ok) {
+        const data = await res.json().catch(() => null);
+        const msg = data?.error ?? 'Failed to save settings';
+        setError(msg);
+        toast.error(msg);
         return;
       }
 

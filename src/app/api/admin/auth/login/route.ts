@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
-import { supabase } from '@/lib/db';
+import { supabaseAdmin } from '@/lib/db';
 import { verifyPassword } from '@/lib/auth/password';
 import { createAdminCookie } from '@/lib/auth/session';
 
@@ -40,7 +40,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Too many attempts. Please try again later.' }, { status: 429 });
     }
 
-    const { data: admin } = await supabase
+    const { data: admin } = await supabaseAdmin
       .from('admins')
       .select('id, email, name, role, password_hash')
       .eq('email', email)
@@ -54,7 +54,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Invalid credentials' }, { status: 401 });
     }
 
-    await supabase
+    await supabaseAdmin
       .from('admins')
       .update({ last_login_at: new Date().toISOString() })
       .eq('id', admin.id);

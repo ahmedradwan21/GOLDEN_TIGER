@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
-import { supabase } from '@/lib/db';
+import { supabaseAdmin } from '@/lib/db';
+import { checkRateLimit, getClientIp, rateLimitResponse } from '@/lib/rate-limit';
 import { hashPassword } from '@/lib/auth/password';
 import { createSessionCookie } from '@/lib/auth/session';
 
@@ -11,6 +12,7 @@ const registerSchema = z.object({
 });
 
 export async function POST(req: NextRequest) {
+  if (!checkRateLimit(`register:${getClientIp(req)}`)) return rateLimitResponse();
   try {
     const body = await req.json();
     const parsed = registerSchema.safeParse(body);
@@ -22,7 +24,7 @@ export async function POST(req: NextRequest) {
     }
 
     const { email, password, name } = parsed.data;
-    const { data: existing } = await supabase
+    const { data: existing } = await supabaseAdmin
       .from('users')
       .select('id')
       .eq('email', email)
@@ -33,7 +35,7 @@ export async function POST(req: NextRequest) {
 
     const passwordHash = await hashPassword(password);
     const id = `usr_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
-    const { data: user, error } = await supabase
+    const { data: user, error } = await supabaseAdmin
       .from('users')
       .insert({ id, email, password_hash: passwordHash, name })
       .select('id, email, name')

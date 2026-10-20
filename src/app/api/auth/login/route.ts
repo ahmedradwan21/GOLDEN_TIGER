@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { supabase } from '@/lib/db';
 import { verifyPassword } from '@/lib/auth/password';
 import { createSessionCookie } from '@/lib/auth/session';
+import { checkRateLimit, getClientIp, rateLimitResponse } from '@/lib/rate-limit';
 
 const loginSchema = z.object({
   email: z.string().email(),
@@ -10,6 +11,7 @@ const loginSchema = z.object({
 });
 
 export async function POST(req: NextRequest) {
+  if (!checkRateLimit(`login:${getClientIp(req)}`)) return rateLimitResponse();
   try {
     const body = await req.json();
     const parsed = loginSchema.safeParse(body);
