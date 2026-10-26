@@ -9,6 +9,8 @@ import { useI18n } from '@/context/I18nContext';
 import { Logo } from '@/components/layout/Logo';
 import { SafeImage } from '@/components/ui/SafeImage';
 import { formatPrice } from '@/lib/pricing';
+import { CouponSection, type CouponItem } from '@/components/CouponSection';
+import { LoyaltyRewards } from '@/components/product/LoyaltyRewards';
 
 interface OrderHistoryItem {
   id: string;
@@ -24,6 +26,7 @@ export default function AccountPage() {
   const router = useRouter();
   const { user, loading, logout } = useAuth();
   const { t, locale } = useI18n();
+  const [coupons, setCoupons] = useState<CouponItem[]>([]);
   const [orders, setOrders] = useState<OrderHistoryItem[]>([]);
   const [ordersLoading, setOrdersLoading] = useState(true);
 
@@ -35,6 +38,7 @@ export default function AccountPage() {
 
   useEffect(() => {
     if (!user) return;
+    fetch('/api/coupons?mine=1').then(r => r.ok ? r.json() : []).then(setCoupons).catch(() => {});
     fetch('/api/account/orders', { credentials: 'same-origin' })
       .then((r) => (r.ok ? r.json() : []))
       .then((data) => setOrders(data))
@@ -88,6 +92,13 @@ export default function AccountPage() {
         </button>
       </div>
 
+      {/* Loyalty Rewards (tiers from loyalty_tiers) */}
+      <div className="mb-6">
+        <LoyaltyRewards userPoints={(user as { points?: number }).points ?? 0} />
+      </div>
+
+      <CouponSection coupons={coupons} hideCommunity className="px-0 sm:px-0 lg:px-0 mb-6"/>
+
       {/* Order History */}
       <div className="bg-surface rounded-xl border border-border p-5 sm:p-6">
         <h2 className="font-heading text-lg font-bold text-text mb-4 flex items-center gap-2">
@@ -140,7 +151,7 @@ export default function AccountPage() {
                       )}
                       <div className="text-xs">
                         <p className="text-text line-clamp-1 max-w-[120px]">{item.title}</p>
-                        <p className="text-muted">{t('common.qty', { qty: item.quantity })}</p>
+                        <p className="text-muted">{t('common.qty').replace('{qty}', String(item.quantity))}</p>
                       </div>
                     </div>
                   ))}

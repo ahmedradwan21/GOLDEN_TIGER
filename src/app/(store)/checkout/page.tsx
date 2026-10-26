@@ -22,20 +22,21 @@ import {
 } from '@/lib/payments/mockGateway';
 import { SafeImage } from '@/components/ui/SafeImage';
 import { cn } from '@/lib/utils';
+import { productTitle } from '@/lib/localize';
 import { track } from '@/lib/tracker';
 import { trackInitiateCheckout } from '@/lib/fbpixel';
 import type { ShippingDetails, DeliveryMethod } from '@/types';
 
 const SHIPPING_SCHEMA = z.object({
-  fullName: z.string().min(2, 'Full name is required'),
-  email: z.string().email('Valid email is required'),
-  phone: z.string().min(10, 'Valid phone number is required'),
-  addressLine1: z.string().min(3, 'Address is required'),
+  fullName: z.string().min(2, 'checkout.err.fullName'),
+  email: z.string().email('checkout.err.email'),
+  phone: z.string().min(10, 'checkout.err.phone'),
+  addressLine1: z.string().min(3, 'checkout.err.address'),
   addressLine2: z.string().optional(),
-  city: z.string().min(2, 'City is required'),
-  stateOrRegion: z.string().min(2, 'State/Region is required'),
-  postalCode: z.string().min(3, 'Postal code is required'),
-  country: z.string().min(2, 'Country is required'),
+  city: z.string().min(2, 'checkout.err.city'),
+  stateOrRegion: z.string().min(2, 'checkout.err.state'),
+  postalCode: z.string().min(3, 'checkout.err.postal'),
+  country: z.string().min(2, 'checkout.err.country'),
 });
 
 const COUNTRIES = [
@@ -49,7 +50,7 @@ export default function CheckoutPage() {
   const router = useRouter();
   const { items, hydrated, clearCart } = useCart();
   const { user } = useAuth();
-  const { t, dir } = useI18n();
+  const { t, dir, locale } = useI18n();
   const BackIcon = ChevronLeft;
   const [orderId, setOrderId] = useState<string | null>(null);
   const [step, setStep] = useState(1);
@@ -159,10 +160,10 @@ export default function CheckoutPage() {
       const fieldErrors: Record<string, string> = {};
       result.error.issues.forEach((issue) => {
         const field = issue.path[0] as string;
-        if (!fieldErrors[field]) fieldErrors[field] = issue.message;
+        if (!fieldErrors[field]) fieldErrors[field] = t(issue.message);
       });
       setErrors(fieldErrors);
-      toast.error('Please fix the errors below.');
+      toast.error(t('checkout.err.fixBelow'));
       return;
     }
     setErrors({});
@@ -200,24 +201,24 @@ export default function CheckoutPage() {
     setPaymentError('');
 
     if (!payment.nameOnCard.trim()) {
-      setPaymentError('Name on card is required.');
+      setPaymentError(t('checkout.err.nameOnCard'));
       return;
     }
     const digits = payment.cardNumber.replace(/\D/g, '');
     if (digits.length < 16) {
-      setPaymentError('Card number must be 16 digits.');
+      setPaymentError(t('checkout.err.cardDigits'));
       return;
     }
     if (!luhnCheck(payment.cardNumber)) {
-      setPaymentError('Invalid card number. Please check and try again.');
+      setPaymentError(t('checkout.err.cardInvalid'));
       return;
     }
     if (!/^\d{2}\/\d{2}$/.test(payment.expiry)) {
-      setPaymentError('Expiry must be in MM/YY format.');
+      setPaymentError(t('checkout.err.expiry'));
       return;
     }
     if (!/^\d{3,4}$/.test(payment.cvc)) {
-      setPaymentError('CVC must be 3 or 4 digits.');
+      setPaymentError(t('checkout.err.cvc'));
       return;
     }
 
@@ -255,10 +256,10 @@ export default function CheckoutPage() {
           const conflict = await completeRes.json();
           setProcessing(false);
           const issueMsg = conflict.items?.map((i: { title: string; available: number; requested: number }) =>
-            `${i.title} (only ${i.available} available, you requested ${i.requested})`
-          ).join(', ') || 'Some items are out of stock';
-          toast.error(`Stock issue: ${issueMsg}`);
-          setPaymentError(`Some items are no longer available: ${issueMsg}`);
+            t('checkout.err.stockItem').replace('{title}', i.title).replace('{available}', String(i.available)).replace('{requested}', String(i.requested))
+          ).join(locale === 'ar' ? '، ' : ', ') || t('checkout.err.outOfStock');
+          toast.error(`${t('checkout.err.stockIssue')} ${issueMsg}`);
+          setPaymentError(`${t('checkout.err.noLongerAvailable')} ${issueMsg}`);
           return;
         }
 
@@ -284,7 +285,7 @@ export default function CheckoutPage() {
             // ignore
           }
           setProcessing(false);
-          toast.success('Payment successful! Redirecting...');
+          toast.success(t('checkout.paymentSuccess'));
           router.push(`/order-confirmation/${completed.orderNumber}`);
           return;
         }
@@ -315,7 +316,7 @@ export default function CheckoutPage() {
     clearCart();
     sessionStorage.removeItem(FORM_STORAGE_KEY);
     sessionStorage.removeItem(DELIVERY_STORAGE_KEY);
-    toast.success('Payment successful! Redirecting...');
+    toast.success(t('checkout.paymentSuccess'));
     router.push(`/order-confirmation/${orderNumber}`);
   }
 
@@ -382,7 +383,7 @@ export default function CheckoutPage() {
                     onChange={(e) => updateShipping('fullName', e.target.value)}
                     autoComplete="name"
                     className={inputClass(errors.fullName)}
-                    placeholder="John Doe"
+                    placeholder={t('placeholder.fullName')}
                   />
                 </FormField>
                 <FormField label={t('common.email')} error={errors.email}>
@@ -392,7 +393,7 @@ export default function CheckoutPage() {
                     onChange={(e) => updateShipping('email', e.target.value)}
                     autoComplete="email"
                     className={inputClass(errors.email)}
-                    placeholder="john@example.com"
+                    placeholder={t('placeholder.email')}
                   />
                 </FormField>
                 <FormField label={t('checkout.field.phone')} error={errors.phone}>
@@ -413,7 +414,7 @@ export default function CheckoutPage() {
                     className={inputClass(errors.country)}
                   >
                     {COUNTRIES.map((c) => (
-                      <option key={c} value={c}>{c}</option>
+                      <option key={c} value={c}>{t(`country.${c}`)}</option>
                     ))}
                   </select>
                 </FormField>
@@ -424,7 +425,7 @@ export default function CheckoutPage() {
                     onChange={(e) => updateShipping('addressLine1', e.target.value)}
                     autoComplete="address-line1"
                     className={inputClass(errors.addressLine1)}
-                    placeholder="123 Main Street"
+                    placeholder={t('placeholder.address1')}
                   />
                 </FormField>
                 <FormField label={t('checkout.field.addressLine2')} full>
@@ -434,7 +435,7 @@ export default function CheckoutPage() {
                     onChange={(e) => updateShipping('addressLine2', e.target.value)}
                     autoComplete="address-line2"
                     className={inputClass()}
-                    placeholder="Apartment, suite, etc."
+                    placeholder={t('placeholder.address2')}
                   />
                 </FormField>
                 <FormField label={t('checkout.field.city')} error={errors.city}>
@@ -444,7 +445,7 @@ export default function CheckoutPage() {
                     onChange={(e) => updateShipping('city', e.target.value)}
                     autoComplete="address-level2"
                     className={inputClass(errors.city)}
-                    placeholder="New York"
+                    placeholder={t('placeholder.city')}
                   />
                 </FormField>
                 <FormField label={t('checkout.field.stateRegion')} error={errors.stateOrRegion}>
@@ -454,7 +455,7 @@ export default function CheckoutPage() {
                     onChange={(e) => updateShipping('stateOrRegion', e.target.value)}
                     autoComplete="address-level1"
                     className={inputClass(errors.stateOrRegion)}
-                    placeholder="NY"
+                    placeholder={t('placeholder.state')}
                   />
                 </FormField>
                 <FormField label={t('checkout.field.postalCode')} error={errors.postalCode}>
@@ -501,8 +502,8 @@ export default function CheckoutPage() {
                           {isSelected && <div className="h-2 w-2 rounded-full bg-gold" />}
                         </div>
                         <div className="flex-1">
-                          <p className="text-sm font-medium text-text">{method.name}</p>
-                          <p className="text-xs text-muted">{method.description}</p>
+                          <p className="text-sm font-medium text-text">{t(`delivery.${method.id}.name`)}</p>
+                          <p className="text-xs text-muted">{t(`delivery.${method.id}.desc`)}</p>
                         </div>
                         <span className={cn('text-sm font-semibold', isFree ? 'text-success' : 'text-text')}>
                           {isFree ? t('common.free') : formatPrice(method.fee)}
@@ -549,26 +550,26 @@ export default function CheckoutPage() {
               <div>
                 <h3 className="text-sm font-semibold text-text mb-2">{t('checkout.deliveryMethod')}</h3>
                 <div className="text-sm text-muted p-3 rounded-lg bg-surface-elevated">
-                  <span className="text-text font-medium">{deliveryMethod.name}</span> - {deliveryMethod.description}
+                  <span className="text-text font-medium">{t(`delivery.${deliveryMethod.id}.name`)}</span> - {t(`delivery.${deliveryMethod.id}.desc`)}
                 </div>
               </div>
 
               {/* Line items */}
               <div>
-                <h3 className="text-sm font-semibold text-text mb-2">{t('common.itemsCount', { count: breakdown.itemCount })}</h3>
+                <h3 className="text-sm font-semibold text-text mb-2">{t('common.itemsCount').replace('{count}', String(breakdown.itemCount))}</h3>
                 <div className="space-y-3">
                   {items.map((item) => (
                     <div key={item.id} className="flex gap-3 items-center">
                       <SafeImage
                         src={item.image}
-                        alt={item.title}
+                        alt={productTitle(item, locale)}
                         width={56}
                         height={56}
                         className="rounded-lg border border-border shrink-0"
                       />
                       <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium text-text line-clamp-1">{item.title}</p>
-                        <p className="text-xs text-muted">{t('common.qty', { qty: item.quantity })} x {formatPrice(item.unitPrice)}</p>
+                        <p dir="auto" className="text-sm font-medium text-text line-clamp-1">{productTitle(item, locale)}</p>
+                        <p className="text-xs text-muted">{t('common.qty').replace('{qty}', String(item.quantity))} x {formatPrice(item.unitPrice)}</p>
                       </div>
                       <span className="text-sm font-semibold text-text">
                         {formatPrice(item.unitPrice * item.quantity)}
@@ -635,7 +636,7 @@ export default function CheckoutPage() {
                   onChange={(e) => setPayment({ ...payment, nameOnCard: e.target.value })}
                   autoComplete="cc-name"
                   className={inputClass()}
-                  placeholder="John Doe"
+                  placeholder={t('placeholder.fullName')}
                 />
               </FormField>
 
@@ -699,7 +700,7 @@ export default function CheckoutPage() {
                 ) : (
                   <>
                     <Lock className="h-4 w-4" />
-                    {t('checkout.pay', { amount: formatPrice(breakdown.total) })}
+                    {t('checkout.pay').replace('{amount}', formatPrice(breakdown.total))}
                   </>
                 )}
               </button>
@@ -723,7 +724,7 @@ export default function CheckoutPage() {
             className="w-full lg:hidden flex items-center justify-between p-4 rounded-lg bg-surface border border-border mb-4"
           >
             <span className="text-sm font-semibold text-text">
-              {t('checkout.orderSummaryWithTotal', { total: formatPrice(breakdown.total) })}
+              {t('checkout.orderSummaryWithTotal').replace('{total}', formatPrice(breakdown.total))}
             </span>
             <ChevronLeft className={cn('h-4 w-4 text-muted transition-transform', summaryOpen && '-rotate-90')} />
           </button>
@@ -741,7 +742,7 @@ export default function CheckoutPage() {
                   <div className="relative shrink-0">
                     <SafeImage
                       src={item.image}
-                      alt={item.title}
+                      alt={productTitle(item, locale)}
                       width={48}
                       height={48}
                       className="rounded-lg border border-border"
@@ -750,7 +751,7 @@ export default function CheckoutPage() {
                       {item.quantity}
                     </span>
                   </div>
-                  <p className="text-xs text-text line-clamp-2 flex-1">{item.title}</p>
+                  <p dir="auto" className="text-xs text-text line-clamp-2 flex-1">{productTitle(item, locale)}</p>
                   <span className="text-xs font-semibold text-text">{formatPrice(item.unitPrice * item.quantity)}</span>
                 </div>
               ))}

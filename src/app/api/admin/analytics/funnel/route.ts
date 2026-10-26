@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { supabase } from '@/lib/db';
+import { supabaseAdmin } from '@/lib/db-admin';
 import { getAdminSession } from '@/lib/auth/session';
 
 export async function GET(req: NextRequest) {
@@ -14,8 +14,8 @@ export async function GET(req: NextRequest) {
 
   try {
     const [logsRes, ordersRes] = await Promise.all([
-      supabase.from('click_logs').select('event_type, session_id').gte('created_at', since),
-      supabase.from('orders').select('id, status, session_id').gte('created_at', since),
+      supabaseAdmin.from('click_logs').select('event_type, session_id').gte('created_at', since),
+      supabaseAdmin.from('orders').select('id, status, session_id').gte('created_at', since),
     ]);
 
     const logs = logsRes.data ?? [];

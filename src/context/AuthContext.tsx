@@ -1,6 +1,7 @@
 'use client';
 
 import { createContext, useContext, useState, useCallback, useEffect, type ReactNode } from 'react';
+import { authFailure, type AuthResult } from '@/lib/auth/errors';
 
 interface AuthUser {
   id: string;
@@ -11,8 +12,8 @@ interface AuthUser {
 interface AuthContextValue {
   user: AuthUser | null;
   loading: boolean;
-  login: (email: string, password: string) => Promise<{ success: boolean; error?: string }>;
-  register: (email: string, password: string, name?: string) => Promise<{ success: boolean; error?: string }>;
+  login: (email: string, password: string) => Promise<AuthResult>;
+  register: (email: string, password: string, name?: string) => Promise<AuthResult>;
   logout: () => Promise<void>;
   refresh: () => Promise<void>;
 }
@@ -44,6 +45,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [refresh]);
 
   const login = useCallback(async (email: string, password: string) => {
+    try {
     const res = await fetch('/api/auth/login', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -52,14 +54,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     });
     if (!res.ok) {
       const data = await res.json().catch(() => ({}));
-      return { success: false, error: data.error ?? 'Login failed' };
+      return authFailure(data, res.status);
     }
     const data = await res.json();
     setUser(data);
     return { success: true };
+    } catch {
+      return { success: false, code: 'NETWORK_ERROR' };
+    }
   }, []);
 
   const register = useCallback(async (email: string, password: string, name?: string) => {
+    try {
     const res = await fetch('/api/auth/register', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -68,11 +74,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     });
     if (!res.ok) {
       const data = await res.json().catch(() => ({}));
-      return { success: false, error: data.error ?? 'Registration failed' };
+      return authFailure(data, res.status);
     }
     const data = await res.json();
     setUser(data);
     return { success: true };
+    } catch {
+      return { success: false, code: 'NETWORK_ERROR' };
+    }
   }, []);
 
   const logout = useCallback(async () => {

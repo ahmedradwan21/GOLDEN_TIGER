@@ -5,7 +5,7 @@ import Link from "next/link";
 import { ChevronLeft, ChevronRight, Trash2, Clock } from "lucide-react";
 import { SafeImage } from "@/components/ui/SafeImage";
 import { Rating } from "@/components/ui/Rating";
-import { cn, discountPercent } from "@/lib/utils";
+import { cn } from "@/lib/utils";
 import { formatPrice } from "@/lib/pricing";
 import { useI18n } from "@/context/I18nContext";
 import { supabase, isDatabaseConfigured } from "@/lib/db";
@@ -135,18 +135,15 @@ export function BrowsingHistory({
 		saveLocalHistory([]);
 		setHistory([]);
 		const sessionId = getSessionId();
-		if (isDatabaseConfigured()) {
-			void (async () => {
-				try {
-					await supabase
-						.from("browsing_history")
-						.delete()
-						.eq("session_id", sessionId);
-				} catch {
-					/* ignore */
-				}
-			})();
-		}
+		void fetch("/api/browsing-history/delete", {
+			method: "POST",
+			headers: { "Content-Type": "application/json" },
+			body: JSON.stringify({ sessionId }),
+		})
+			.then(async (res) => {
+				if (!res.ok) console.error("[browsing-history] clear failed:", await res.text());
+			})
+			.catch((err) => console.error("[browsing-history] clear failed:", err));
 	}
 
 	return (
@@ -187,10 +184,6 @@ export function BrowsingHistory({
 						style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}
 					>
 						{relatedProducts.map((product) => {
-							const discount = discountPercent(
-								product.price,
-								product.compareAtPrice,
-							);
 							return (
 								<Link
 									key={product.id}
@@ -205,11 +198,7 @@ export function BrowsingHistory({
 											sizes="208px"
 											className="object-cover transition-transform duration-500 group-hover:scale-105"
 										/>
-										{discount !== null && (
-											<span className="absolute top-2 right-2 bg-success text-white text-xs font-bold px-2 py-0.5 rounded-md">
-												-{discount}%
-											</span>
-										)}
+										
 									</div>
 									<div className="p-3 space-y-2">
 										<h3 className="text-xs font-semibold text-muted line-clamp-1">

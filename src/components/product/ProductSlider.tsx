@@ -5,14 +5,19 @@ import Link from 'next/link';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { ProductCard } from '@/components/product/ProductCard';
 import type { Product } from '@/types';
+import { useI18n } from '@/context/I18nContext';
 
 interface ProductSliderProps {
-  title: string;
+  title?: string;
+  /** Translation key; takes precedence over title. */
+  titleKey?: string;
   products: Product[];
   seeAllHref?: string;
 }
 
-export function ProductSlider({ title, products, seeAllHref }: ProductSliderProps) {
+export function ProductSlider({ title: rawTitle, titleKey, products, seeAllHref }: ProductSliderProps) {
+  const { t } = useI18n();
+  const title = titleKey ? t(titleKey) : rawTitle ?? '';
   const scrollRef = useRef<HTMLDivElement>(null);
 
   const scroll = useCallback((direction: 'left' | 'right') => {
@@ -34,21 +39,21 @@ export function ProductSlider({ title, products, seeAllHref }: ProductSliderProp
           <div className="flex items-center gap-3">
             {seeAllHref && (
               <Link href={seeAllHref} className="text-sm text-gold hover:text-gold-light transition-colors">
-                See all
+                {t('slider.seeAll')}
               </Link>
             )}
             <div className="hidden md:flex gap-1">
               <button
                 onClick={() => scroll('left')}
                 className="h-8 w-8 rounded-full bg-surface border border-border flex items-center justify-center text-text hover:text-gold transition-colors"
-                aria-label={`Scroll ${title} left`}
+                aria-label={`${t('slider.scrollLeft')} ${title}`}
               >
                 <ChevronLeft className="h-4 w-4" />
               </button>
               <button
                 onClick={() => scroll('right')}
                 className="h-8 w-8 rounded-full bg-surface border border-border flex items-center justify-center text-text hover:text-gold transition-colors"
-                aria-label={`Scroll ${title} right`}
+                aria-label={`${t('slider.scrollRight')} ${title}`}
               >
                 <ChevronRight className="h-4 w-4" />
               </button>

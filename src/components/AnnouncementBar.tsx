@@ -1,101 +1,77 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import Link from 'next/link';
+import { useEffect, useState } from 'react';
+import { X } from 'lucide-react';
 import { useI18n } from '@/context/I18nContext';
-import { supabase } from '@/lib/db';
-import { cn } from '@/lib/utils';
-import type { Database } from '@/types/database';
+import {
+  announcementDismissKey,
+  pickAnnouncementMessage,
+  type AnnouncementSettings,
+} from '@/lib/announcement';
 
-type AnnouncementBarSettings = Database['public']['Tables']['announcement_bar_settings']['Row'];
-
-function isWithinSchedule(
-  now: Date,
-  startsAt: string | null,
-  endsAt: string | null
-): boolean {
-  if (startsAt) {
-    const start = new Date(startsAt);
-    if (now.getTime() < start.getTime()) return false;
-  }
-  if (endsAt) {
-    const end = new Date(endsAt);
-    if (now.getTime() > end.getTime()) return false;
-  }
-  return true;
-}
-
+/**
+ * Storefront announcement bar, rendered above the header.
+ * Reads the single settings row through /api/announcement (server-side read),
+ * shows message_ar for Arabic, and can be closed. Closing is remembered per
+ * message, so a new announcement appears again.
+ */
 export function AnnouncementBar() {
-  const { t, locale, dir } = useI18n();
-  const [settings, setSettings] = useState<AnnouncementBarSettings | null>(null);
-  const [loaded, setLoaded] = useState(false);
+  const { t, locale } = useI18n();
+  const [settings, setSettings] = useState<AnnouncementSettings | null>(null);
+  const [dismissed, setDismissed] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
-    async function load() {
-      try {
-        const { data, error } = await supabase
-          .from('announcement_bar_settings')
-          .select('*')
-          .eq('id', 'main')
-          .maybeSingle();
-        if (error) return;
-        if (!cancelled) setSettings(data);
-      } catch {
-        // Non-critical: storefront must keep rendering without the bar
-      } finally {
-        if (!cancelled) setLoaded(true);
-      }
-    }
-    load();
+    fetch('/api/announcement', { cache: 'no-store' })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data: AnnouncementSettings | null) => {
+        if (cancelled || !data) return;
+        try {
+          if (window.localStorage.getItem(announcementDismissKey(data)) === '1') setDismissed(true);
+        } catch {
+          // storage unavailable: show the bar
+        }
+        setSettings(data);
+      })
+      .catch(() => {
+        // Non-critical: storefront keeps rendering without the bar
+      });
     return () => {
       cancelled = true;
     };
   }, []);
 
-  if (!loaded || !settings) return null;
-  if (!settings.is_enabled) return null;
-  if (!isWithinSchedule(new Date(), settings.starts_at, settings.ends_at)) return null;
+  const message = pickAnnouncementMessage(settings, locale);
+  if (!settings || !message || dismissed) return null;
 
-  const message = locale === 'ar' ? settings.message_ar : settings.message_en;
-  if (!message) return null;
+  function dismiss() {
+    setDismissed(true);
+    try {
+      if (settings) window.localStorage.setItem(announcementDismissKey(settings), '1');
+    } catch {
+      // ignore
+    }
+  }
 
-  const hasValidLink =
-    typeof settings.link_url === 'string' && settings.link_url.trim().length > 0;
-
-  const barStyle: React.CSSProperties = {
-    backgroundColor: settings.background_color,
-    color: settings.text_color,
-  };
-
-  const content = (
+  return (
     <div
-      className="w-full py-2.5 text-center text-sm font-medium animate-fade-in"
-      style={barStyle}
+      className="relative w-full bg-gold-gradient text-background text-sm font-medium animate-fade-in"
       role="region"
-      aria-label={t('topbar.freeship')}
+      aria-label={t('announcement.label')}
     >
-      <div className="max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8">
-        <p
-          className={cn(
-            'truncate transition-colors',
-            hasValidLink && 'hover:underline cursor-pointer'
-          )}
-          dir={locale === 'ar' ? 'rtl' : 'ltr'}
-        >
+      <div className="max-w-[1440px] mx-auto px-10 sm:px-12 py-2.5 text-center">
+        <p dir={locale === 'ar' ? 'rtl' : 'ltr'} className="leading-snug">
           {message}
         </p>
       </div>
+      <button
+        type="button"
+        onClick={dismiss}
+        aria-label={t('announcement.dismiss')}
+        className="absolute top-1/2 -translate-y-1/2 end-2 sm:end-4 h-7 w-7 inline-flex items-center justify-center rounded-full hover:opacity-70 transition-opacity focus-ring"
+      >
+        <X className="h-4 w-4" />
+      </button>
     </div>
   );
-
-  if (hasValidLink) {
-    return (
-      <Link href={settings.link_url as string} className="block focus-ring">
-        {content}
-      </Link>
-    );
-  }
-
-  return content;
 }

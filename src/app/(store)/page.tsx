@@ -1,3 +1,4 @@
+import { getActiveBrands, getDisplayCoupons } from '@/lib/data/catalog-settings';
 import { HeroSlider } from '@/components/HeroSlider';
 import { MarketingBanner } from '@/components/MarketingBanner';
 import { CouponSection } from '@/components/CouponSection';
@@ -16,19 +17,25 @@ import {
   getHomepageRelatedProducts,
 } from '@/lib/data/products';
 
+// Re-read banners at least every minute so scheduled starts/ends take effect;
+// admin banner saves also refresh the homepage immediately.
+export const revalidate = 60;
+
 export default async function HomePage() {
-  const [slides, categories, deals, relatedProducts] = await Promise.all([
+  const [slides, categories, deals, relatedProducts, brands, coupons] = await Promise.all([
     getHeroSlides(),
     getCategoryTree(),
     getDealsOfTheDay(),
     getHomepageRelatedProducts(),
+    getActiveBrands(),
+    getDisplayCoupons(),
   ]);
 
   const productsByCategory = await Promise.all(
-    categories.map(async (cat) => {
-      const result = await getProductsByCategory(cat.slug, 1, 10);
-      return { category: cat, products: result.products };
-    })
+    categories.map(async (cat) => ({
+      category: cat,
+      products: await getProductsByCategory(cat.slug),
+    }))
   );
 
   const allProducts = productsByCategory.flatMap(({ products }) => products);
@@ -42,9 +49,9 @@ export default async function HomePage() {
 
       <CategoryFeatureGrid categories={categories} products={allProducts} />
 
-      <BrandsHub />
+      <BrandsHub brands={brands} />
 
-      <CouponSection />
+      <CouponSection coupons={coupons} />
 
       {productsByCategory.map(({ category, products }) =>
         products.length > 0 ? (

@@ -99,7 +99,7 @@ export function Footer() {
 
         <div className={cn('mt-12 pt-6 border-t border-border flex flex-col sm:flex-row items-center justify-between gap-4', dir === 'rtl' && 'sm:flex-row-reverse')}>
           <p className="text-xs text-muted">
-            &copy; {new Date().getFullYear()} The Golden Tiger. {t('footer.allRightsReserved')}
+            &copy; {new Date().getFullYear()} {t('brand.name')}. {t('footer.allRightsReserved')}
           </p>
           <p className="text-xs text-muted">
             {t('footer.builtWithCare')}

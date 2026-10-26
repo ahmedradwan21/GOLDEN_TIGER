@@ -1,9 +1,11 @@
 import type { Category, Product } from '@/types';
+import { normalizeProductImages } from '@/lib/product-images';
 
 interface CategoryRow {
   id: string;
   slug: string;
   name: string;
+  name_ar?: string | null;
   parent_id: string | null;
   image_url: string | null;
   sort_order: number;
@@ -13,15 +15,17 @@ interface ProductRow {
   id: string;
   slug: string;
   title: string;
+  title_ar?: string | null;
   brand: string | null;
   description: string;
+  description_ar?: string | null;
   features: string[];
   specifications: Record<string, string> | null;
   price_cents: number;
   compare_at_cents: number | null;
   stock: number;
-  images: string[];
-  video_urls: string[];
+  images?: unknown;
+  video_urls?: unknown;
   rating: number;
   review_count: number;
   tags: string[];
@@ -50,12 +54,14 @@ export function mapCategoryRow(cat: CategoryRow, allCats: CategoryRow[]): Catego
     id: cat.id,
     slug: cat.slug,
     name: cat.name,
+    nameAr: cat.name_ar ?? '',
     parentId: cat.parent_id,
     image: cat.image_url ?? '',
     subcategories: children.map((child) => ({
       id: child.id,
       slug: child.slug,
       name: child.name,
+      nameAr: child.name_ar ?? '',
       parentId: child.parent_id,
       image: child.image_url ?? '',
       subcategories: [],
@@ -68,16 +74,18 @@ export function mapProductRow(p: ProductRow): Product {
     id: p.id,
     slug: p.slug,
     title: p.title,
+    titleAr: p.title_ar ?? '',
     brand: p.brand ?? '',
     price: p.price_cents,
     compareAtPrice: p.compare_at_cents ?? undefined,
     rating: p.rating,
     reviewCount: p.review_count,
     stock: p.stock,
-    images: p.images,
-    videoUrls: p.video_urls,
+    images: normalizeProductImages(p.images),
+    videoUrls: normalizeProductImages(p.video_urls),
     features: p.features,
     description: p.description,
+    descriptionAr: p.description_ar ?? '',
     specifications: (p.specifications as Record<string, string>) ?? {},
     tags: p.tags,
     categoryId: p.category_id,

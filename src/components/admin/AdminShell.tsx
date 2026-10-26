@@ -1,10 +1,11 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { LayoutDashboard, ChartBar as BarChart3, Package, ShoppingCart, LogOut, Menu, X, Store, Crown, Flame, MessageSquare, FileText, Briefcase, Megaphone, Share2 } from 'lucide-react';
+import { LayoutDashboard, ChartBar as BarChart3, Package, ShoppingCart, LogOut, Menu, X, Store, Crown, Award, Flame, MessageSquare, FileText, Briefcase, Megaphone, Share2, GalleryHorizontal } from 'lucide-react';
 import { useI18n } from '@/context/I18nContext';
+import { DEFAULT_PROGRAM_NAME, localizedProgramName, type LoyaltySettings } from '@/lib/loyalty-settings';
 import { ThemeSwitcher } from '@/components/layout/ThemeSwitcher';
 import { LanguageSwitcher } from '@/components/layout/LanguageSwitcher';
 
@@ -19,21 +20,34 @@ export function AdminShell({
 }) {
   const pathname = usePathname();
   const router = useRouter();
-  const { t, dir } = useI18n();
+  const { t, dir, locale } = useI18n();
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [programSettings, setProgramSettings] = useState<LoyaltySettings>({ ...DEFAULT_PROGRAM_NAME });
+
+  useEffect(() => {
+    fetch('/api/loyalty/settings')
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => { if (d?.settings) setProgramSettings(d.settings); })
+      .catch(() => {});
+  }, []);
 
   const navItems = [
     { href: '/admin', label: t('admin.nav.overview'), icon: LayoutDashboard },
     { href: '/admin/analytics', label: t('admin.nav.analytics'), icon: BarChart3 },
     { href: '/admin/inventory', label: t('admin.nav.inventory'), icon: Package },
+    { href: '/admin/banners', label: t('admin.nav.banners'), icon: GalleryHorizontal },
+    { href: '/admin/brands', label: t('admin.nav.brands'), icon: Store },
+    { href: '/admin/categories', label: t('admin.nav.categories'), icon: Package },
+    { href: '/admin/coupons', label: t('admin.nav.coupons'), icon: Award },
     { href: '/admin/orders', label: t('admin.nav.orders'), icon: ShoppingCart },
     { href: '/admin/loyalty', label: t('admin.nav.loyalty'), icon: Crown },
+    { href: '/admin/loyalty-tiers', label: localizedProgramName(programSettings, locale), icon: Award },
     { href: '/admin/campaigns', label: t('admin.nav.campaigns'), icon: Flame },
-    { href: '/admin/reviews', label: 'Reviews', icon: MessageSquare },
+    { href: '/admin/reviews', label: t('admin.nav.reviews'), icon: MessageSquare },
     { href: '/admin/content', label: t('admin.nav.content'), icon: FileText },
     { href: '/admin/careers', label: t('admin.nav.careers'), icon: Briefcase },
-    { href: '/admin/announcement', label: dir === 'rtl' ? 'الإعلان العلوي' : 'Announcement Bar', icon: Megaphone },
-    { href: '/admin/community', label: dir === 'rtl' ? 'قنوات التواصل' : 'Community Channels', icon: Share2 },
+    { href: '/admin/announcement', label: t('admin.nav.announcement'), icon: Megaphone },
+    { href: '/admin/community', label: t('admin.nav.community'), icon: Share2 },
   ];
 
   async function handleLogout() {
@@ -78,7 +92,7 @@ export function AdminShell({
           </button>
         </div>
 
-        <nav className="p-4 space-y-1">
+        <nav className="p-4 space-y-1 overflow-y-auto max-h-[calc(100vh-250px)]">
           {navItems.map((item) => {
             const Icon = item.icon;
             const isActive = pathname === item.href;

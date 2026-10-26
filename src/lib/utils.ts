@@ -1,6 +1,7 @@
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 import type { CartItem, CartItemSnapshot, Product } from '@/types';
+import { normalizeProductImages } from '@/lib/product-images';
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -11,7 +12,8 @@ export function productToSnapshot(product: Product): CartItemSnapshot {
     id: product.id,
     slug: product.slug,
     title: product.title,
-    image: product.images[0] ?? '',
+    titleAr: product.titleAr ?? '',
+    image: normalizeProductImages(product.images)[0] ?? '',
     unitPrice: product.price,
     stock: product.stock,
   };

@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { supabase } from '@/lib/db';
+import { supabaseAdmin } from '@/lib/db-admin';
 import { getAdminSession } from '@/lib/auth/session';
 
 export async function GET() {
@@ -14,11 +14,11 @@ export async function GET() {
     const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
 
     const [productsRes, ordersRes, completedOrdersRes, clickLogsRes, lowStockRes] = await Promise.all([
-      supabase.from('products').select('id, stock, price_cents, is_published').eq('is_published', true),
-      supabase.from('orders').select('id, order_number, status, total_cents, created_at, completed_at').gte('created_at', thirtyDaysAgo.toISOString()),
-      supabase.from('orders').select('id, total_cents').eq('status', 'COMPLETED').gte('completed_at', thirtyDaysAgo.toISOString()),
-      supabase.from('click_logs').select('id, event_type, created_at').gte('created_at', sevenDaysAgo.toISOString()),
-      supabase.from('products').select('id, title, stock').lt('stock', 10).eq('is_published', true),
+      supabaseAdmin.from('products').select('id, stock, price_cents, is_published').eq('is_published', true),
+      supabaseAdmin.from('orders').select('id, order_number, status, total_cents, created_at, completed_at').gte('created_at', thirtyDaysAgo.toISOString()),
+      supabaseAdmin.from('orders').select('id, total_cents').eq('status', 'COMPLETED').gte('completed_at', thirtyDaysAgo.toISOString()),
+      supabaseAdmin.from('click_logs').select('id, event_type, created_at').gte('created_at', sevenDaysAgo.toISOString()),
+      supabaseAdmin.from('products').select('id, title, stock').lt('stock', 10).eq('is_published', true),
     ]);
 
     const products = productsRes.data ?? [];

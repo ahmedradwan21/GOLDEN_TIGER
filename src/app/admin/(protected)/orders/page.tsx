@@ -6,6 +6,8 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { ShoppingCart, Loader2, ChevronLeft, ChevronRight } from 'lucide-react';
 import { formatPrice } from '@/lib/pricing';
+import { useI18n } from '@/context/I18nContext';
+import { fmt } from '@/lib/admin-i18n';
 
 interface Order {
   id: string;
@@ -30,6 +32,12 @@ interface OrdersResponse {
 }
 
 export default function AdminOrdersPage() {
+  const { t } = useI18n();
+  const statusLabel = (s: string) => {
+    const key = `admin.orders.status.${s}`;
+    const v = t(key);
+    return v === key ? s.replace(/_/g, ' ') : v;
+  };
   const [data, setData] = useState<OrdersResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(1);
@@ -56,8 +64,8 @@ export default function AdminOrdersPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="font-heading text-3xl font-bold">Orders</h1>
-        <p className="text-muted mt-1">{data?.total ?? 0} total orders</p>
+        <h1 className="font-heading text-3xl font-bold">{t('admin.orders.title')}</h1>
+        <p className="text-muted mt-1">{fmt(t('admin.orders.count'), { n: data?.total ?? 0 })}</p>
       </div>
 
       {/* Status filter */}
@@ -70,7 +78,7 @@ export default function AdminOrdersPage() {
             onClick={() => { setStatusFilter(s); setPage(1); }}
             className={statusFilter === s ? 'gold-button' : ''}
           >
-            {s === '' ? 'All' : s.replace(/_/g, ' ')}
+            {s === '' ? t('admin.orders.all') : statusLabel(s)}
           </Button>
         ))}
       </div>
@@ -83,21 +91,21 @@ export default function AdminOrdersPage() {
         ) : orders.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-20 text-muted">
             <ShoppingCart className="w-12 h-12 mb-3" />
-            <p>No orders found</p>
+            <p>{t('admin.orders.empty')}</p>
           </div>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-border text-muted text-xs uppercase">
-                  <th className="text-left py-3 px-4">Order #</th>
-                  <th className="text-left py-3 px-4">Email</th>
-                  <th className="text-center py-3 px-4">Status</th>
-                  <th className="text-right py-3 px-4">Subtotal</th>
-                  <th className="text-right py-3 px-4">Tax</th>
-                  <th className="text-right py-3 px-4">Shipping</th>
-                  <th className="text-right py-3 px-4">Total</th>
-                  <th className="text-left py-3 px-4">Date</th>
+                  <th className="text-left py-3 px-4">{t('admin.orders.colNumber')}</th>
+                  <th className="text-left py-3 px-4">{t('admin.orders.colEmail')}</th>
+                  <th className="text-center py-3 px-4">{t('admin.common.status')}</th>
+                  <th className="text-right py-3 px-4">{t('admin.orders.colSubtotal')}</th>
+                  <th className="text-right py-3 px-4">{t('admin.orders.colTax')}</th>
+                  <th className="text-right py-3 px-4">{t('admin.orders.colShipping')}</th>
+                  <th className="text-right py-3 px-4">{t('admin.orders.colTotal')}</th>
+                  <th className="text-left py-3 px-4">{t('admin.orders.colDate')}</th>
                 </tr>
               </thead>
               <tbody>
@@ -112,7 +120,7 @@ export default function AdminOrdersPage() {
                         o.status === 'CANCELLED' ? 'bg-red-500/20 text-red-400' :
                         'bg-yellow-500/20 text-yellow-400'
                       }>
-                        {o.status.replace(/_/g, ' ')}
+                        {statusLabel(o.status)}
                       </Badge>
                     </td>
                     <td className="py-3 px-4 text-right text-muted">{formatPrice(o.subtotal_cents)}</td>
@@ -131,7 +139,7 @@ export default function AdminOrdersPage() {
 
         {data && data.totalPages > 1 && (
           <div className="flex items-center justify-between p-4 border-t border-border">
-            <span className="text-xs text-muted">Page {page} of {data.totalPages}</span>
+            <span className="text-xs text-muted">{fmt(t('admin.common.page'), { page, total: data.totalPages })}</span>
             <div className="flex gap-2">
               <Button variant="outline" size="sm" disabled={page <= 1} onClick={() => setPage(page - 1)}>
                 <ChevronLeft className="w-4 h-4" />

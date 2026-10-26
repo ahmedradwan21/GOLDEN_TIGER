@@ -14,6 +14,7 @@ export interface Database {
           id: string;
           slug: string;
           name: string;
+          name_ar: string | null;
           parent_id: string | null;
           image_url: string | null;
           sort_order: number;
@@ -23,6 +24,7 @@ export interface Database {
           id: string;
           slug: string;
           name: string;
+          name_ar?: string | null;
           parent_id?: string | null;
           image_url?: string | null;
           sort_order?: number;
@@ -31,10 +33,17 @@ export interface Database {
           id?: string;
           slug?: string;
           name?: string;
+          name_ar?: string | null;
           parent_id?: string | null;
           image_url?: string | null;
           sort_order?: number;
         };
+        Relationships: [];
+      };
+      brands: {
+        Row: { id: string; slug: string; name_en: string; name_ar: string | null; logo_url: string | null; sort_order: number; is_active: boolean };
+        Insert: { id?: string; slug: string; name_en: string; name_ar?: string | null; logo_url?: string | null; sort_order?: number; is_active?: boolean };
+        Update: { slug?: string; name_en?: string; name_ar?: string | null; logo_url?: string | null; sort_order?: number; is_active?: boolean };
         Relationships: [];
       };
       products: {
@@ -42,6 +51,8 @@ export interface Database {
           id: string;
           slug: string;
           title: string;
+          title_ar: string | null;
+          description_ar: string | null;
           brand: string | null;
           sku: string | null;
           short_description: string | null;
@@ -77,6 +88,8 @@ export interface Database {
           id?: string;
           slug: string;
           title: string;
+          title_ar?: string | null;
+          description_ar?: string | null;
           brand?: string | null;
           sku?: string | null;
           short_description?: string | null;
@@ -110,6 +123,8 @@ export interface Database {
           id?: string;
           slug?: string;
           title?: string;
+          title_ar?: string | null;
+          description_ar?: string | null;
           brand?: string | null;
           sku?: string | null;
           short_description?: string | null;
@@ -382,6 +397,9 @@ export interface Database {
         Row: {
           id: string;
           code: string;
+          title_en?: string | null;
+          title_ar?: string | null;
+          image_url?: string | null;
           discount_type: string;
           value: number;
           max_uses: number | null;
@@ -396,6 +414,9 @@ export interface Database {
         Insert: {
           id?: string;
           code: string;
+          title_en?: string | null;
+          title_ar?: string | null;
+          image_url?: string | null;
           discount_type?: string;
           value: number;
           max_uses?: number | null;
@@ -408,6 +429,9 @@ export interface Database {
         Update: {
           id?: string;
           code?: string;
+          title_en?: string | null;
+          title_ar?: string | null;
+          image_url?: string | null;
           discount_type?: string;
           value?: number;
           max_uses?: number | null;
@@ -662,41 +686,24 @@ export interface Database {
         ];
       };
       announcement_bar_settings: {
+        // Single-row table. Only these columns are read or written by the app.
         Row: {
           id: string;
-          is_enabled: boolean;
-          message_en: string;
-          message_ar: string;
-          link_url: string | null;
-          background_color: string;
-          text_color: string;
-          starts_at: string | null;
-          ends_at: string | null;
-          updated_at: string;
+          message_en: string | null;
+          message_ar: string | null;
+          is_active: boolean;
         };
         Insert: {
-          id: string;
-          is_enabled?: boolean;
-          message_en?: string;
-          message_ar?: string;
-          link_url?: string | null;
-          background_color?: string;
-          text_color?: string;
-          starts_at?: string | null;
-          ends_at?: string | null;
-          updated_at?: string;
+          id?: string;
+          message_en?: string | null;
+          message_ar?: string | null;
+          is_active?: boolean;
         };
         Update: {
           id?: string;
-          is_enabled?: boolean;
-          message_en?: string;
-          message_ar?: string;
-          link_url?: string | null;
-          background_color?: string;
-          text_color?: string;
-          starts_at?: string | null;
-          ends_at?: string | null;
-          updated_at?: string;
+          message_en?: string | null;
+          message_ar?: string | null;
+          is_active?: boolean;
         };
         Relationships: [];
       };

@@ -3,6 +3,8 @@ import type { Category, Product, HeroSlide } from '@/types';
 import { supabase, isDatabaseConfigured } from '@/lib/db';
 import { ensureDatabaseConfigured } from '@/lib/env';
 import { mapCategoryRow, mapProductRow, type CategoryRow, type ProductRow } from './mappers';
+import { normalizeProductImages } from '@/lib/product-images';
+import { selectLiveBanners } from '@/lib/homepage-banners';
 
 export async function getCategoryTree(): Promise<Category[]> {
   if (!isDatabaseConfigured()) return [];
@@ -50,7 +52,7 @@ export async function getFeaturedProducts(): Promise<Product[]> {
     .from('products')
     .select('*')
     .eq('is_published', true)
-    .filter('tags', 'cs', '{bestseller}')
+    .filter('tags', 'cs', '"{""bestseller""}"')
     .order('rating', { ascending: false })
     .limit(8);
 
@@ -59,12 +61,8 @@ export async function getFeaturedProducts(): Promise<Product[]> {
   return (data as ProductRow[]).map(mapProductRow);
 }
 
-export async function getProductsByCategory(
-  slug: string,
-  page: number = 1,
-  pageSize: number = 24
-): Promise<{ products: Product[]; total: number; page: number; pageSize: number }> {
-  if (!isDatabaseConfigured()) return { products: [], total: 0, page, pageSize };
+export async function getProductsByCategory(slug: string): Promise<Product[]> {
+  if (!isDatabaseConfigured()) return [];
   ensureDatabaseConfigured();
 
   const { data: cat } = await supabase
@@ -72,7 +70,7 @@ export async function getProductsByCategory(
     .select('id')
     .eq('slug', slug)
     .maybeSingle();
-  if (!cat) return { products: [], total: 0, page, pageSize };
+  if (!cat) return [];
 
   const { data: subcats } = await supabase
     .from('categories')
@@ -81,22 +79,18 @@ export async function getProductsByCategory(
 
   const categoryIds = [cat.id, ...((subcats ?? []).map((s: { id: string }) => s.id))];
 
-  const from = (page - 1) * pageSize;
-  const to = page * pageSize - 1;
-
-  const { data, count, error } = await supabase
+  const { data, error } = await supabase
     .from('products')
-    .select('*', { count: 'exact' })
+    .select('*')
     .in('category_id', categoryIds)
     .eq('is_published', true)
     .order('is_sponsored', { ascending: false })
     .order('ad_priority', { ascending: false })
-    .order('created_at', { ascending: true })
-    .range(from, to);
+    .order('created_at', { ascending: true });
 
-  if (error) { console.error('[getProductsByCategory] Supabase error:', error.message); return { products: [], total: 0, page, pageSize }; }
-  if (!data) return { products: [], total: 0, page, pageSize };
-  return { products: (data as ProductRow[]).map(mapProductRow), total: count ?? 0, page, pageSize };
+  if (error) { console.error('[getProductsByCategory] Supabase error:', error.message); return []; }
+  if (!data) return [];
+  return (data as ProductRow[]).map(mapProductRow);
 }
 
 export async function getProductBySlug(slug: string): Promise<Product | null> {
@@ -139,35 +133,17 @@ export async function getRelatedProducts(productId: string): Promise<Product[]> 
   return (data as ProductRow[]).map(mapProductRow);
 }
 
-export async function getHeroSlides(): Promise<HeroSlide[]> {
-  const staticSlides: HeroSlide[] = [
-    {
-      id: 'slide-1',
-      image: 'https://images.pexels.com/photos/16387546/pexels-photo-16387546.jpeg?auto=compress&cs=tinysrgb&h=800&w=1600',
-      headline: 'Premium Electronics, Unbeatable Prices',
-      subcopy: 'Discover the latest in audio, wearables, and computing technology.',
-      ctaText: 'Shop Electronics',
-      ctaHref: '/category/electronics',
-    },
-    {
-      id: 'slide-2',
-      image: 'https://images.pexels.com/photos/1488470/pexels-photo-1488470.jpeg?auto=compress&cs=tinysrgb&h=800&w=1600',
-      headline: 'Elevate Your Style',
-      subcopy: 'Curated fashion for every occasion, from casual to couture.',
-      ctaText: 'Shop Fashion',
-      ctaHref: '/category/fashion',
-    },
-    {
-      id: 'slide-3',
-      image: 'https://images.pexels.com/photos/7166645/pexels-photo-7166645.jpeg?auto=compress&cs=tinysrgb&h=800&w=1600',
-      headline: 'Transform Your Home',
-      subcopy: 'Premium kitchen appliances and decor for the modern home.',
-      ctaText: 'Shop Home & Kitchen',
-      ctaHref: '/category/home-kitchen',
-    },
-  ];
+const BANNER_FALLBACK_IMAGE =
+  'https://images.pexels.com/photos/16387546/pexels-photo-16387546.jpeg?auto=compress&cs=tinysrgb&h=800&w=1600';
+const MAX_HERO_SLIDES = 10;
 
-  if (!isDatabaseConfigured()) return staticSlides;
+/**
+ * Homepage hero slides. Only products with is_homepage_banner = true whose
+ * schedule is live (ad_starts_at null or <= now, ad_ends_at null or >= now),
+ * ordered by ad_priority (highest first). Each slide links to its product.
+ */
+export async function getHeroSlides(): Promise<HeroSlide[]> {
+  if (!isDatabaseConfigured()) return [];
   ensureDatabaseConfigured();
 
   try {
@@ -176,41 +152,32 @@ export async function getHeroSlides(): Promise<HeroSlide[]> {
       .select('*')
       .eq('is_published', true)
       .eq('is_homepage_banner', true)
-      .order('ad_priority', { ascending: false })
-      .limit(5);
+      .order('ad_priority', { ascending: false });
 
-    if (error || !data || data.length === 0) return staticSlides;
+    if (error) {
+      console.error('[getHeroSlides] Supabase error:', error.message);
+      return [];
+    }
 
-    const rows = data as ProductRow[];
-    const now = new Date();
-    const active = rows.filter((r) => {
-      const start = r.ad_starts_at ? new Date(r.ad_starts_at) : null;
-      const end = r.ad_ends_at ? new Date(r.ad_ends_at) : null;
-      if (start && now < start) return false;
-      if (end && now > end) return false;
-      return true;
-    });
+    const live = selectLiveBanners((data ?? []) as ProductRow[], new Date()).slice(0, MAX_HERO_SLIDES);
 
-    if (active.length === 0) return staticSlides;
-
-    const adSlides: HeroSlide[] = active.map((p) => ({
-      id: `ad-banner-${p.id}`,
+    return live.map((p) => ({
+      id: `banner-${p.id}`,
       image:
         p.banner_image_url ||
-        (p.images?.[0]
-          ? p.images[0].replace('h=600&w=600', 'h=800&w=1600')
-          : 'https://images.pexels.com/photos/16387546/pexels-photo-16387546.jpeg?auto=compress&cs=tinysrgb&h=800&w=1600'),
+        normalizeProductImages(p.images)[0]?.replace('h=600&w=600', 'h=800&w=1600') ||
+        BANNER_FALLBACK_IMAGE,
       headline: p.banner_headline || p.title,
+      headlineAr: p.banner_headline ? null : p.title_ar || null,
       subcopy: p.banner_subtext || p.short_description || p.brand || '',
       ctaText: 'Shop Now',
       ctaHref: `/product/${p.slug}`,
       sponsored: true,
       productId: p.id,
     }));
-
-    return [...adSlides, ...staticSlides];
-  } catch {
-    return staticSlides;
+  } catch (err) {
+    console.error('[getHeroSlides] failed:', err instanceof Error ? err.message : err);
+    return [];
   }
 }
 

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
-import { supabase } from '@/lib/db';
+import { supabaseAdmin } from '@/lib/db-admin';
 import { getSession } from '@/lib/auth/session';
 import { TAX_RATE } from '@/lib/pricing';
 import { generateOrderNumber } from '@/lib/payments/mockGateway';
@@ -9,6 +9,14 @@ const completeSchema = z.object({
   sessionId: z.string().min(1),
   paymentRef: z.string().min(1),
 });
+
+function dbFail(step: string, error: { message: string; code?: string } | null) {
+  console.error(`[checkout] ${step} failed:`, error?.code, error?.message);
+  return NextResponse.json(
+    { error: `Database error during ${step}: ${error?.message ?? 'unknown error'} (possible RLS rejection)`, code: error?.code ?? null },
+    { status: 500 }
+  );
+}
 
 export async function POST(
   req: NextRequest,
@@ -23,29 +31,32 @@ export async function POST(
 
     const session = await getSession();
 
-    const { data: order } = await supabase
+    const { data: order, error: orderError } = await supabaseAdmin
       .from('orders')
       .select('*')
       .eq('id', params.orderId)
       .maybeSingle();
+    if (orderError) return dbFail('orders select', orderError);
     if (!order) {
       return NextResponse.json({ error: 'Order not found' }, { status: 404 });
     }
 
-    const { data: items } = await supabase
+    const { data: items, error: itemsError } = await supabaseAdmin
       .from('order_items')
       .select('*')
       .eq('order_id', params.orderId);
+    if (itemsError) return dbFail('order_items select', itemsError);
 
     if (!items || items.length === 0) {
       return NextResponse.json({ error: 'Order has no items' }, { status: 400 });
     }
 
     const productIds = items.map((i: { product_id: string | null }) => i.product_id).filter(Boolean) as string[];
-    const { data: products } = await supabase
+    const { data: products, error: productsError } = await supabaseAdmin
       .from('products')
       .select('id, title, price_cents, stock, is_published')
       .in('id', productIds);
+    if (productsError) return dbFail('products select', productsError);
 
     const productMap = new Map((products ?? []).map((p: { id: string; title: string; price_cents: number; stock: number; is_published: boolean }) => [p.id, p]));
 
@@ -84,19 +95,43 @@ export async function POST(
     }
     const total = subtotal + tax + shipping;
 
-    for (const item of items as { product_id: string | null; quantity: number }[]) {
-      if (!item.product_id) continue;
-      const p = productMap.get(item.product_id);
-      if (p) {
-        await supabase
+    // Atomic stock decrement via the decrement_stock DB function (returns true/false).
+    // If any item fails, restore the items already decremented and abort WITHOUT completing the order.
+    const decremented: { productId: string; quantity: number }[] = [];
+    const rollback = async () => {
+      for (const d of decremented) {
+        const { data: cur } = await supabaseAdmin.from('products').select('stock').eq('id', d.productId).maybeSingle();
+        if (!cur) { console.error(`[checkout] rollback: product ${d.productId} not found`); continue; }
+        const { error: rbError } = await supabaseAdmin
           .from('products')
-          .update({ stock: Math.max(0, p.stock - item.quantity) })
-          .eq('id', item.product_id);
+          .update({ stock: (cur as { stock: number }).stock + d.quantity })
+          .eq('id', d.productId);
+        if (rbError) console.error(`[checkout] rollback failed for ${d.productId}:`, rbError.message);
       }
+    };
+
+    for (const item of items as { product_id: string | null; title_snapshot: string; quantity: number }[]) {
+      if (!item.product_id) continue;
+      const { data: ok, error: rpcError } = await supabaseAdmin.rpc('decrement_stock' as never, {
+        p_id: item.product_id,
+        qty: item.quantity,
+      } as never);
+      if (rpcError) {
+        await rollback();
+        return dbFail(`decrement_stock (${item.product_id})`, rpcError);
+      }
+      if (ok !== true) {
+        await rollback();
+        return NextResponse.json(
+          { error: 'insufficient stock', items: [{ productId: item.product_id, title: item.title_snapshot, requested: item.quantity }] },
+          { status: 409 }
+        );
+      }
+      decremented.push({ productId: item.product_id, quantity: item.quantity });
     }
 
     const orderNumber = generateOrderNumber();
-    await supabase
+    const { data: doneRows, error: completeError } = await supabaseAdmin
       .from('orders')
       .update({
         status: 'COMPLETED',
@@ -110,10 +145,14 @@ export async function POST(
         shipping_cents: shipping,
         total_cents: total,
       })
-      .eq('id', params.orderId);
+      .eq('id', params.orderId)
+      .select('id');
+    if (completeError) { await rollback(); return dbFail('orders complete update', completeError); }
+    if (!doneRows || doneRows.length === 0) { await rollback(); return dbFail('orders complete update', { message: 'no rows updated' }); }
 
     return NextResponse.json({ orderId: params.orderId, orderNumber, totalCents: total });
-  } catch {
-    return NextResponse.json({ error: 'Something went wrong' }, { status: 500 });
+  } catch (err) {
+    console.error('[checkout] Unexpected error:', err);
+    return NextResponse.json({ error: `Unexpected checkout error: ${err instanceof Error ? err.message : String(err)}` }, { status: 500 });
   }
 }

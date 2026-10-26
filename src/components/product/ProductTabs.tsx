@@ -4,6 +4,7 @@ import { useState, useRef } from 'react';
 import { cn } from '@/lib/utils';
 import { useI18n } from '@/context/I18nContext';
 import type { Product } from '@/types';
+import { productDescription } from '@/lib/localize';
 
 type TabKey = 'description' | 'features' | 'specifications' | 'reviews' | 'shipping';
 
@@ -16,7 +17,7 @@ const RATING_DISTRIBUTION = [
 ];
 
 export function ProductTabs({ product }: { product: Product }) {
-  const { t, dir } = useI18n();
+  const { t, dir, locale } = useI18n();
   const [active, setActive] = useState<TabKey>('description');
   const tabListRef = useRef<HTMLDivElement>(null);
 
@@ -49,14 +50,14 @@ export function ProductTabs({ product }: { product: Product }) {
     }
   }
 
-  const paragraphs = product.description.split('\n\n');
+  const paragraphs = productDescription(product, locale).split(/\n\s*\n/).filter((p) => p.trim() !== '');
 
   return (
     <div className="bg-surface rounded-xl border border-border overflow-hidden">
       <div
         ref={tabListRef}
         role="tablist"
-        aria-label="Product information"
+        aria-label={t('product.tabs.ariaLabel')}
         onKeyDown={handleKeyDown}
         className="flex overflow-x-auto no-scrollbar border-b border-border"
       >
@@ -85,7 +86,7 @@ export function ProductTabs({ product }: { product: Product }) {
         {active === 'description' && (
           <div role="tabpanel" id="panel-description" className="prose prose-invert max-w-none">
             {paragraphs.map((para, i) => (
-              <p key={i} className={cn('text-sm text-muted leading-relaxed mb-4', dir === 'rtl' && 'text-right')}>
+              <p key={i} dir="auto" className="text-sm text-muted leading-relaxed mb-4 whitespace-pre-line text-start [unicode-bidi:plaintext]">
                 {para}
               </p>
             ))}
@@ -98,7 +99,7 @@ export function ProductTabs({ product }: { product: Product }) {
               {product.features.map((feature, i) => (
                 <li key={i} className={cn('flex items-start gap-3 text-sm text-text', dir === 'rtl' && 'flex-row-reverse text-right')}>
                   <span className="h-1.5 w-1.5 rounded-full bg-gold shrink-0 mt-1.5" />
-                  {feature}
+                  <span dir="auto" className="[unicode-bidi:plaintext]">{feature}</span>
                 </li>
               ))}
             </ul>
@@ -112,7 +113,7 @@ export function ProductTabs({ product }: { product: Product }) {
                 {Object.entries(product.specifications).map(([key, value]) => (
                   <tr key={key} className="border-b border-border last:border-0">
                     <td className={cn('py-3 text-muted font-medium w-1/3', dir === 'rtl' ? 'pr-4 text-right' : 'pr-4')}>{key}</td>
-                    <td className={cn('py-3 text-text', dir === 'rtl' && 'text-right')}>{value}</td>
+                    <td dir="auto" className="py-3 text-text text-start [unicode-bidi:plaintext]">{value}</td>
                   </tr>
                 ))}
               </tbody>

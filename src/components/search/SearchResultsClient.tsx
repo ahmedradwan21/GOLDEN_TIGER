@@ -7,6 +7,7 @@ import { SearchBox } from '@/components/layout/SearchBox';
 import { Star, ChevronDown, X, SlidersHorizontal } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { SearchResponse } from '@/types';
+import { useI18n } from '@/context/I18nContext';
 
 interface SearchResultsClientProps {
   q: string;
@@ -378,6 +379,7 @@ function FilterSidebar({
   clearAllFilters,
   hasActiveFilters,
 }: FilterSidebarProps) {
+  const { locale } = useI18n();
   return (
     <div className="space-y-6">
       {hasActiveFilters && (
@@ -402,7 +404,7 @@ function FilterSidebar({
                     c.slug === category ? 'text-gold font-medium' : 'text-muted hover:text-text'
                   )}
                 >
-                  <span>{c.name}</span>
+                  <span dir="auto">{locale === 'ar' && c.nameAr?.trim() ? c.nameAr : c.name}</span>
                   <span className="text-xs text-muted/70">{c.count}</span>
                 </button>
               </li>

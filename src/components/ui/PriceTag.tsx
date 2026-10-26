@@ -28,9 +28,6 @@ export function PriceTag({
           <span className={cn('text-muted line-through', compareSize)}>
             {formatPrice(compareAtPrice)}
           </span>
-          <span className="text-xs font-semibold text-success bg-success/10 px-1.5 py-0.5 rounded">
-            {discount}% off
-          </span>
         </>
       )}
     </div>

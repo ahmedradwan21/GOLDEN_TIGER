@@ -18,6 +18,7 @@ import { useCart } from '@/context/CartContext';
 import { useAuth } from '@/context/AuthContext';
 import { useI18n } from '@/context/I18nContext';
 import type { Category } from '@/types';
+import { categoryName } from '@/lib/localize';
 import { cn } from '@/lib/utils';
 import { LogOut } from 'lucide-react';
 
@@ -29,7 +30,7 @@ export function Header({ categories }: HeaderProps) {
   const pathname = usePathname();
   const { itemCount, openMiniCart } = useCart();
   const { user, loading: authLoading, logout } = useAuth();
-  const { t, dir } = useI18n();
+  const { t, dir, locale } = useI18n();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [megaOpen, setMegaOpen] = useState(false);
   const [hydrated, setHydrated] = useState(false);
@@ -126,7 +127,7 @@ export function Header({ categories }: HeaderProps) {
               <button
                 onClick={openMiniCart}
                 className="relative flex items-center justify-center h-10 w-10 rounded-lg hover:bg-surface-elevated focus-ring text-text"
-aria-label={t('home.cartItems', { n: hydrated ? itemCount : 0 })}
+aria-label={t('home.cartItems').replace('{n}', String(hydrated ? itemCount : 0))}
               >
                 <ShoppingCart className="h-5 w-5" />
                 {hydrated && itemCount > 0 && (
@@ -169,7 +170,7 @@ aria-label={t('home.cartItems', { n: hydrated ? itemCount : 0 })}
                           href={`/category/${cat.slug}`}
                           className="block text-sm font-semibold text-gold hover:text-gold-light transition-colors mb-2"
                         >
-                          {cat.name}
+                          {categoryName(cat, locale)}
                         </Link>
                         <ul className="space-y-1">
                           {cat.subcategories.map((sub) => (
@@ -178,7 +179,7 @@ aria-label={t('home.cartItems', { n: hydrated ? itemCount : 0 })}
                                 href={`/category/${sub.slug}`}
                                 className="text-xs text-muted hover:text-text transition-colors"
                               >
-                                {sub.name}
+                                {categoryName(sub, locale)}
                               </Link>
                             </li>
                           ))}
@@ -195,7 +196,7 @@ aria-label={t('home.cartItems', { n: hydrated ? itemCount : 0 })}
                   href={`/category/${cat.slug}`}
                   className="h-11 flex items-center px-3 text-sm text-muted hover:text-gold transition-colors focus-ring rounded-lg"
                 >
-                  {cat.name}
+                  {categoryName(cat, locale)}
                 </Link>
               ))}
             </div>
@@ -230,7 +231,7 @@ aria-label={t('home.cartItems', { n: hydrated ? itemCount : 0 })}
                       href={`/category/${cat.slug}`}
                       className="block py-2.5 px-3 rounded-lg text-sm font-medium text-text hover:bg-surface-elevated transition-colors"
                     >
-                      {cat.name}
+                      {categoryName(cat, locale)}
                     </Link>
                     <ul className={cn('mb-1', dir === 'rtl' ? 'mr-3' : 'ml-3')}>
                       {cat.subcategories.map((sub) => (
@@ -239,7 +240,7 @@ aria-label={t('home.cartItems', { n: hydrated ? itemCount : 0 })}
                             href={`/category/${sub.slug}`}
                             className="block py-2 px-3 rounded-lg text-xs text-muted hover:text-gold transition-colors"
                           >
-                            {sub.name}
+                            {categoryName(sub, locale)}
                           </Link>
                         </li>
                       ))}

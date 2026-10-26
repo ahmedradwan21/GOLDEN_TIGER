@@ -14,13 +14,20 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
-import { Package, Plus, Search, Pencil, Trash2, Loader as Loader2, CircleAlert as AlertCircle, Sparkles } from 'lucide-react';
+import { Package, Plus, Search, Pencil, Trash2, Loader2, AlertCircle, Sparkles, GalleryHorizontal, ImageOff } from 'lucide-react';
+import Link from 'next/link';
+import { BannerStatusBadge } from '@/components/admin/BannerStatusBadge';
+import { MAX_AD_PRIORITY, clampPriority, fromLocalInputValue, toLocalInputValue } from '@/lib/homepage-banners';
 import { formatPrice } from '@/lib/pricing';
+import { useI18n } from '@/context/I18nContext';
+import { fmt } from '@/lib/admin-i18n';
 
 interface Product {
   id: string;
   slug: string;
   title: string;
+  title_ar?: string | null;
+  description_ar?: string | null;
   brand: string | null;
   sku: string | null;
   price_cents: number;
@@ -54,10 +61,19 @@ interface Category {
   id: string;
   slug: string;
   name: string;
+  name_ar?: string | null;
   parent_id: string | null;
 }
 
 export default function AdminInventoryPage() {
+  const { t, locale } = useI18n();
+  const [brands, setBrands] = useState<{id:string;name_en:string;name_ar?:string|null}[]>([]);
+  const [newBrand, setNewBrand] = useState(false);
+  const [importOpen, setImportOpen] = useState(false);
+  const [csvFile, setCsvFile] = useState<File | null>(null);
+  const [importing, setImporting] = useState(false);
+  const [importError, setImportError] = useState(false);
+  const [importSummary, setImportSummary] = useState<{imported:number;updated:number;skipped:number;errors:{row:number;message:string}[]} | null>(null);
   const [products, setProducts] = useState<Product[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
@@ -69,11 +85,13 @@ export default function AdminInventoryPage() {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [deleteId, setDeleteId] = useState<string | null>(null);
+  const [isEditing, setIsEditing] = useState(false);
+  const [saveError, setSaveError] = useState('');
 
   const loadProducts = useCallback(async () => {
     setLoading(true);
     try {
-      const params = new URLSearchParams({ page: String(page), limit: '50' });
+      const params = new URLSearchParams({ page: String(page), limit: '20' });
       if (search) params.set('search', search);
       const res = await fetch(`/api/admin/products?${params}`);
       if (res.ok) {
@@ -91,24 +109,60 @@ export default function AdminInventoryPage() {
     loadProducts();
   }, [loadProducts]);
 
+  // Open a product directly when linked from /admin/banners (?edit=<id>).
+  useEffect(() => {
+    const id = new URLSearchParams(window.location.search).get('edit');
+    if (!id) return;
+    fetch(`/api/admin/products/${encodeURIComponent(id)}`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((full) => {
+        if (!full) return;
+        setNewBrand(false);
+        setSaveError('');
+        setIsEditing(true);
+        setEditProduct(full);
+        setIsDialogOpen(true);
+      })
+      .catch(() => {});
+  }, []);
+
   useEffect(() => {
     async function loadCategories() {
       const res = await fetch('/api/admin/categories');
       if (res.ok) setCategories(await res.json());
     }
     loadCategories();
+    fetch('/api/admin/brands').then(r => r.ok ? r.json() : []).then(setBrands).catch(() => {});
   }, []);
 
-  function handleEdit(product: Product) {
+  async function handleEdit(product: Product) {
+    setNewBrand(false);
+    setSaveError('');
+    setIsEditing(true);
     setEditProduct(product);
     setIsDialogOpen(true);
+    // Load the full product (description, Arabic fields, etc.) — the list only has summary columns.
+    try {
+      const res = await fetch(`/api/admin/products/${product.id}`);
+      if (res.ok) {
+        const full = await res.json();
+        setEditProduct((cur) => (cur && cur.id === product.id ? { ...cur, ...full } : cur));
+      }
+    } catch {
+      // keep summary data
+    }
   }
 
   function handleCreate() {
+    setNewBrand(false);
+    setSaveError('');
+    setIsEditing(false);
     setEditProduct({
       id: '',
       slug: '',
       title: '',
+      title_ar: '',
+      description_ar: '',
       brand: null,
       sku: null,
       price_cents: 0,
@@ -151,7 +205,7 @@ export default function AdminInventoryPage() {
         stock: Number(editProduct.stock),
       };
 
-      const isEdit = !!editProduct.id && products.some(p => p.id === editProduct.id);
+      const isEdit = isEditing && !!editProduct.id;
       const url = isEdit ? `/api/admin/products/${editProduct.id}` : '/api/admin/products';
       const method = isEdit ? 'PATCH' : 'POST';
 
@@ -164,8 +218,18 @@ export default function AdminInventoryPage() {
       if (res.ok) {
         setIsDialogOpen(false);
         setEditProduct(null);
+        setSaveError('');
         loadProducts();
+        fetch('/api/admin/brands').then(r => r.ok ? r.json() : []).then(setBrands).catch(() => {});
+      } else {
+        const data = await res.json().catch(() => null);
+        const code = typeof data?.error === 'string' ? data.error : '';
+        const key = `admin.banner.error.${code}`;
+        const translated = code ? t(key) : '';
+        setSaveError(translated && translated !== key ? translated : code || t('admin.common.saveFailed'));
       }
+    } catch {
+      setSaveError(t('admin.common.saveFailed'));
     } finally {
       setSaving(false);
     }
@@ -182,6 +246,20 @@ export default function AdminInventoryPage() {
     }
   }
 
+  async function handleImport() {
+    if (!csvFile) return;
+    setImporting(true); setImportError(false); setImportSummary(null);
+    try {
+      const form = new FormData(); form.set('file', csvFile);
+      const res = await fetch('/api/admin/products/import', { method: 'POST', body: form });
+      if (!res.ok) throw new Error();
+      setImportSummary(await res.json());
+      setPage(1); await loadProducts();
+      fetch('/api/admin/brands').then(r => r.ok ? r.json() : []).then(setBrands).catch(() => {});
+    } catch { setImportError(true); }
+    finally { setImporting(false); }
+  }
+
   function updateField<K extends keyof Product>(field: K, value: Product[K]) {
     if (editProduct) setEditProduct({ ...editProduct, [field]: value });
   }
@@ -190,20 +268,33 @@ export default function AdminInventoryPage() {
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="font-heading text-3xl font-bold">Inventory Management</h1>
-          <p className="text-muted mt-1">{total} products in catalog</p>
+          <h1 className="font-heading text-3xl font-bold">{t('admin.inventory.title')}</h1>
+          <p className="text-muted mt-1">{fmt(t('admin.inventory.count'), { n: total })}</p>
         </div>
+        <div className="flex flex-wrap gap-2">
+        <Button variant="outline" onClick={() => { setImportOpen(true);setImportSummary(null);setImportError(false);setCsvFile(null); }}>{t('admin.import.button')}</Button>
         <Button onClick={handleCreate} className="gold-button">
           <Plus className="w-4 h-4 mr-2" />
-          Add Product
+          {t('admin.inventory.add')}
         </Button>
+        </div>
       </div>
+
+      <Dialog open={importOpen} onOpenChange={open => {if (!importing) setImportOpen(open);}}>
+        <DialogContent className="bg-surface max-h-[90vh] overflow-y-auto"><DialogHeader><DialogTitle>{t('admin.import.button')}</DialogTitle></DialogHeader>
+          <Button variant="outline" asChild><a href="/api/admin/products/import" download>{t('admin.import.template')}</a></Button>
+          <Label htmlFor="csv-upload">{t('admin.import.file')}</Label><Input id="csv-upload" type="file" accept=".csv,text/csv" disabled={importing} onChange={e => setCsvFile(e.target.files?.[0] ?? null)}/>
+          {importError && <p role="alert" className="text-danger">{t('admin.import.failed')}</p>}
+          {importSummary && <div role="status"><p>{fmt(t('admin.import.summary'),{imported:importSummary.imported,updated:importSummary.updated,skipped:importSummary.skipped})}</p><ul className="mt-3 space-y-2 text-sm text-danger">{importSummary.errors.map((error,i) => <li key={i}>{fmt(t('admin.import.row'),{row:error.row})}: {error.message}</li>)}</ul></div>}
+          <DialogFooter><Button variant="outline" disabled={importing} onClick={() => setImportOpen(false)}>{t('admin.common.cancel')}</Button><Button className="gold-button" disabled={!csvFile || importing} onClick={handleImport}>{importing && <Loader2 className="h-4 w-4 me-2 animate-spin"/>}{t('admin.import.upload')}</Button></DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Search */}
       <div className="relative max-w-md">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted" />
         <Input
-          placeholder="Search products..."
+          placeholder={t('admin.inventory.search')}
           value={search}
           onChange={(e) => { setSearch(e.target.value); setPage(1); }}
           className="pl-10 bg-surface"
@@ -219,19 +310,19 @@ export default function AdminInventoryPage() {
         ) : products.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-20 text-muted">
             <Package className="w-12 h-12 mb-3" />
-            <p>No products found</p>
+            <p>{t('admin.inventory.empty')}</p>
           </div>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-border text-muted text-xs uppercase">
-                  <th className="text-left py-3 px-4">Product</th>
-                  <th className="text-left py-3 px-4">SKU</th>
-                  <th className="text-right py-3 px-4">Price</th>
-                  <th className="text-right py-3 px-4">Stock</th>
-                  <th className="text-center py-3 px-4">Status</th>
-                  <th className="text-right py-3 px-4">Actions</th>
+                  <th className="text-left py-3 px-4">{t('admin.inventory.colProduct')}</th>
+                  <th className="text-left py-3 px-4">{t('admin.inventory.colSku')}</th>
+                  <th className="text-right py-3 px-4">{t('admin.inventory.colPrice')}</th>
+                  <th className="text-right py-3 px-4">{t('admin.inventory.colStock')}</th>
+                  <th className="text-center py-3 px-4">{t('admin.common.status')}</th>
+                  <th className="text-right py-3 px-4">{t('admin.common.actions')}</th>
                 </tr>
               </thead>
               <tbody>
@@ -239,7 +330,7 @@ export default function AdminInventoryPage() {
                   <tr key={p.id} className="border-b border-border/50 last:border-0 hover:bg-surface-elevated/50 transition-colors">
                     <td className="py-3 px-4">
                       <div className="font-medium text-text">{p.title}</div>
-                      <div className="text-xs text-muted">{p.brand ?? 'No brand'}</div>
+                      <div className="text-xs text-muted">{p.brand ?? t('admin.inventory.noBrand')}</div>
                     </td>
                     <td className="py-3 px-4 text-muted">{p.sku ?? '—'}</td>
                     <td className="py-3 px-4 text-right">
@@ -257,7 +348,7 @@ export default function AdminInventoryPage() {
                     </td>
                     <td className="py-3 px-4 text-center">
                       <Badge variant={p.is_published ? 'default' : 'secondary'} className={p.is_published ? 'bg-green-500/20 text-green-400' : ''}>
-                        {p.is_published ? 'Live' : 'Hidden'}
+                        {p.is_published ? t('admin.inventory.live') : t('admin.inventory.hidden')}
                       </Badge>
                     </td>
                     <td className="py-3 px-4 text-right">
@@ -286,7 +377,7 @@ export default function AdminInventoryPage() {
         {/* Pagination */}
         {totalPages > 1 && (
           <div className="flex items-center justify-between p-4 border-t border-border">
-            <span className="text-xs text-muted">Page {page} of {totalPages}</span>
+            <span className="text-xs text-muted">{fmt(t('admin.common.page'), { page, total: totalPages })}</span>
             <div className="flex gap-2">
               <Button
                 variant="outline"
@@ -294,7 +385,7 @@ export default function AdminInventoryPage() {
                 disabled={page <= 1}
                 onClick={() => setPage(page - 1)}
               >
-                Previous
+                {t('admin.common.previous')}
               </Button>
               <Button
                 variant="outline"
@@ -302,7 +393,7 @@ export default function AdminInventoryPage() {
                 disabled={page >= totalPages}
                 onClick={() => setPage(page + 1)}
               >
-                Next
+                {t('admin.common.next')}
               </Button>
             </div>
           </div>
@@ -313,14 +404,14 @@ export default function AdminInventoryPage() {
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
         <DialogContent className="bg-surface border-border max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>{editProduct?.id ? 'Edit Product' : 'New Product'}</DialogTitle>
+            <DialogTitle>{isEditing ? t('admin.inventory.edit') : t('admin.inventory.new')}</DialogTitle>
           </DialogHeader>
 
           {editProduct && (
             <div className="space-y-4 py-4">
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label>Title</Label>
+                  <Label>{t('admin.product.title')}</Label>
                   <Input
                     value={editProduct.title}
                     onChange={(e) => updateField('title', e.target.value)}
@@ -328,7 +419,7 @@ export default function AdminInventoryPage() {
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label>Slug</Label>
+                  <Label>{t('admin.product.slug')}</Label>
                   <Input
                     value={editProduct.slug}
                     onChange={(e) => updateField('slug', e.target.value)}
@@ -337,17 +428,32 @@ export default function AdminInventoryPage() {
                 </div>
               </div>
 
+              <div className="space-y-2">
+                <Label>{t('admin.product.titleAr')} <span className="text-xs text-muted">{t('admin.common.optional')}</span></Label>
+                <Input
+                  dir="rtl"
+                  value={editProduct.title_ar ?? ''}
+                  onChange={(e) => updateField('title_ar', e.target.value)}
+                  className="bg-background"
+                />
+                <p className="text-xs text-muted">{t('admin.product.arabicNote')}</p>
+              </div>
+
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label>Brand</Label>
-                  <Input
-                    value={editProduct.brand ?? ''}
-                    onChange={(e) => updateField('brand', e.target.value || null)}
-                    className="bg-background"
-                  />
+                  <Label>{t('admin.product.brand')}</Label>
+                  <Select value={newBrand ? '__new' : editProduct.brand || '__none'} onValueChange={value => { setNewBrand(value === '__new');updateField('brand', value === '__new' || value === '__none' ? null : value); }}>
+                    <SelectTrigger className="bg-background"><SelectValue placeholder={t('admin.import.selectBrand')}/></SelectTrigger>
+                    <SelectContent><SelectItem value="__none">{t('admin.import.none')}</SelectItem>
+                      {editProduct.brand && !brands.some(b => b.name_en === editProduct.brand) && !newBrand && <SelectItem value={editProduct.brand}>{editProduct.brand}</SelectItem>}
+                      {brands.map(b => <SelectItem key={b.id} value={b.name_en}>{locale === 'ar' && b.name_ar?.trim() ? b.name_ar : b.name_en}</SelectItem>)}
+                      <SelectItem value="__new">{t('admin.import.addBrand')}</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  {newBrand && <Input aria-label={t('admin.import.newBrand')} placeholder={t('admin.import.newBrand')} value={editProduct.brand ?? ''} onChange={e => updateField('brand', e.target.value || null)}/> }
                 </div>
                 <div className="space-y-2">
-                  <Label>SKU</Label>
+                  <Label>{t('admin.product.sku')}</Label>
                   <Input
                     value={editProduct.sku ?? ''}
                     onChange={(e) => updateField('sku', e.target.value || null)}
@@ -357,17 +463,17 @@ export default function AdminInventoryPage() {
               </div>
 
               <div className="space-y-2">
-                <Label>Category</Label>
+                <Label>{t('admin.product.category')}</Label>
                 <Select
                   value={editProduct.category_id}
                   onValueChange={(v) => updateField('category_id', v)}
                 >
                   <SelectTrigger className="bg-background">
-                    <SelectValue placeholder="Select category" />
+                    <SelectValue placeholder={t('admin.product.selectCategory')} />
                   </SelectTrigger>
                   <SelectContent>
                     {categories.map((c) => (
-                      <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
+                      <SelectItem key={c.id} value={c.id}>{locale === 'ar' && c.name_ar?.trim() ? c.name_ar : c.name}</SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
@@ -375,7 +481,7 @@ export default function AdminInventoryPage() {
 
               <div className="grid grid-cols-3 gap-4">
                 <div className="space-y-2">
-                  <Label>Price (cents)</Label>
+                  <Label>{t('admin.product.price')}</Label>
                   <Input
                     type="number"
                     value={editProduct.price_cents}
@@ -384,7 +490,7 @@ export default function AdminInventoryPage() {
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label>Compare At (cents)</Label>
+                  <Label>{t('admin.product.compareAt')}</Label>
                   <Input
                     type="number"
                     value={editProduct.compare_at_cents ?? ''}
@@ -393,7 +499,7 @@ export default function AdminInventoryPage() {
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label>Stock</Label>
+                  <Label>{t('admin.product.stock')}</Label>
                   <Input
                     type="number"
                     value={editProduct.stock}
@@ -404,7 +510,7 @@ export default function AdminInventoryPage() {
               </div>
 
               <div className="space-y-2">
-                <Label>Short Description</Label>
+                <Label>{t('admin.product.shortDescription')}</Label>
                 <Input
                   value={editProduct.short_description ?? ''}
                   onChange={(e) => updateField('short_description', e.target.value || null)}
@@ -413,7 +519,7 @@ export default function AdminInventoryPage() {
               </div>
 
               <div className="space-y-2">
-                <Label>Description</Label>
+                <Label>{t('admin.product.description')}</Label>
                 <Textarea
                   value={editProduct.description ?? ''}
                   onChange={(e) => updateField('description', e.target.value)}
@@ -423,7 +529,19 @@ export default function AdminInventoryPage() {
               </div>
 
               <div className="space-y-2">
-                <Label>Tags (comma-separated)</Label>
+                <Label>{t('admin.product.descriptionAr')} <span className="text-xs text-muted">{t('admin.common.optional')}</span></Label>
+                <Textarea
+                  dir="rtl"
+                  value={editProduct.description_ar ?? ''}
+                  onChange={(e) => updateField('description_ar', e.target.value)}
+                  rows={4}
+                  className="bg-background"
+                />
+                <p className="text-xs text-muted">{t('admin.product.arabicNote')}</p>
+              </div>
+
+              <div className="space-y-2">
+                <Label>{t('admin.product.tags')}</Label>
                 <Input
                   value={(editProduct.tags ?? []).join(', ')}
                   onChange={(e) => updateField('tags', e.target.value.split(',').map(t => t.trim()).filter(Boolean))}
@@ -432,18 +550,18 @@ export default function AdminInventoryPage() {
               </div>
 
               <div className="space-y-2">
-                <Label>Features (one per line)</Label>
+                <Label>{t('admin.product.features')}</Label>
                 <Textarea
                   value={(editProduct.features ?? []).join('\n')}
                   onChange={(e) => updateField('features', e.target.value.split('\n').map(f => f.trim()).filter(Boolean))}
                   rows={4}
-                  placeholder={'Enter one feature per line'}
+                  placeholder={t('admin.product.featuresPlaceholder')}
                   className="bg-background"
                 />
               </div>
 
               <div className="space-y-2">
-                <Label>Image URLs (one per line)</Label>
+                <Label>{t('admin.product.images')}</Label>
                 <Textarea
                   value={(editProduct.images ?? []).join('\n')}
                   onChange={(e) => updateField('images', e.target.value.split('\n').map(u => u.trim()).filter(Boolean))}
@@ -454,7 +572,7 @@ export default function AdminInventoryPage() {
               </div>
 
               <div className="space-y-2">
-                <Label>Video URLs (one per line)</Label>
+                <Label>{t('admin.product.videos')}</Label>
                 <Textarea
                   value={(editProduct.video_urls ?? []).join('\n')}
                   onChange={(e) => updateField('video_urls', e.target.value.split('\n').map(u => u.trim()).filter(Boolean))}
@@ -465,7 +583,7 @@ export default function AdminInventoryPage() {
               </div>
 
               <div className="space-y-2">
-                <Label>SEO Title</Label>
+                <Label>{t('admin.product.seoTitle')}</Label>
                 <Input
                   value={editProduct.seo_title ?? ''}
                   onChange={(e) => updateField('seo_title', e.target.value || null)}
@@ -474,7 +592,7 @@ export default function AdminInventoryPage() {
               </div>
 
               <div className="space-y-2">
-                <Label>SEO Description</Label>
+                <Label>{t('admin.product.seoDescription')}</Label>
                 <Textarea
                   value={editProduct.seo_description ?? ''}
                   onChange={(e) => updateField('seo_description', e.target.value || null)}
@@ -484,7 +602,7 @@ export default function AdminInventoryPage() {
               </div>
 
               <div className="space-y-2">
-                <Label>SEO Meta Keywords</Label>
+                <Label>{t('admin.product.seoKeywords')}</Label>
                 <Textarea
                   value={editProduct.seo_keywords ?? ''}
                   onChange={(e) => updateField('seo_keywords', e.target.value || null)}
@@ -495,115 +613,173 @@ export default function AdminInventoryPage() {
               </div>
 
               <div className="flex items-center justify-between">
-                <Label>Published</Label>
+                <Label>{t('admin.product.published')}</Label>
                 <Switch
                   checked={editProduct.is_published}
                   onCheckedChange={(v) => updateField('is_published', v)}
                 />
               </div>
 
-              {/* Advertising Panel */}
-              <div className="border border-border rounded-lg p-4 space-y-4 bg-background/50">
-                <div className="flex items-center gap-2">
-                  <Sparkles className="w-4 h-4 text-gold" />
-                  <h3 className="text-sm font-semibold text-gold">Advertising Settings</h3>
-                </div>
-
-                <div className="flex items-center justify-between">
-                  <div>
-                    <Label>Sponsored Search Placement</Label>
-                    <p className="text-xs text-muted mt-0.5">Pin this product at the top of search and category results</p>
+              {/* Sponsored search placement */}
+              <div className="border border-border rounded-lg p-4 bg-background/50">
+                <div className="flex items-center justify-between gap-4">
+                  <div className="flex items-start gap-2">
+                    <Sparkles className="w-4 h-4 text-gold mt-0.5" />
+                    <div>
+                      <Label>{t('admin.product.sponsored')}</Label>
+                      <p className="text-xs text-muted mt-0.5">{t('admin.product.sponsoredDesc')}</p>
+                    </div>
                   </div>
                   <Switch
                     checked={editProduct.is_sponsored ?? false}
                     onCheckedChange={(v) => updateField('is_sponsored', v)}
                   />
                 </div>
+              </div>
 
-                <div className="flex items-center justify-between">
-                  <div>
-                    <Label>Homepage Hero Banner</Label>
-                    <p className="text-xs text-muted mt-0.5">Feature this product as a rotating banner on the homepage</p>
+              {/* Homepage Banner */}
+              <section className="border border-gold/30 rounded-lg p-4 space-y-4 bg-background/50" aria-labelledby="homepage-banner-heading">
+                <div className="flex items-start justify-between gap-4">
+                  <div className="flex items-start gap-2">
+                    <GalleryHorizontal className="w-4 h-4 text-gold mt-0.5" />
+                    <div>
+                      <h3 id="homepage-banner-heading" className="text-sm font-semibold text-gold">{t('admin.banner.section')}</h3>
+                      <p className="text-xs text-muted mt-0.5">{t('admin.product.homepageBannerDesc')}</p>
+                    </div>
                   </div>
-                  <Switch
-                    checked={editProduct.is_homepage_banner ?? false}
-                    onCheckedChange={(v) => updateField('is_homepage_banner', v)}
-                  />
-                </div>
-
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label>Ad Priority (0-100)</Label>
-                    <Input
-                      type="number"
-                      min={0}
-                      max={100}
-                      value={editProduct.ad_priority ?? 0}
-                      onChange={(e) => updateField('ad_priority', Math.max(0, Math.min(100, Number(e.target.value))))}
-                      className="bg-background"
-                    />
-                    <p className="text-xs text-muted">Higher values appear first</p>
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Ad Start Date</Label>
-                    <Input
-                      type="datetime-local"
-                      value={editProduct.ad_starts_at ? editProduct.ad_starts_at.slice(0, 16) : ''}
-                      onChange={(e) => updateField('ad_starts_at', e.target.value ? new Date(e.target.value).toISOString() : null)}
-                      className="bg-background"
+                  <div className="flex items-center gap-3">
+                    {editProduct.is_homepage_banner && (
+                      <BannerStatusBadge row={editProduct} isPublished={editProduct.is_published} />
+                    )}
+                    <Switch
+                      checked={editProduct.is_homepage_banner ?? false}
+                      onCheckedChange={(v) => updateField('is_homepage_banner', v)}
+                      aria-label={t('admin.banner.section')}
                     />
                   </div>
                 </div>
 
-                <div className="space-y-2">
-                  <Label>Ad End Date</Label>
-                  <Input
-                    type="datetime-local"
-                    value={editProduct.ad_ends_at ? editProduct.ad_ends_at.slice(0, 16) : ''}
-                    onChange={(e) => updateField('ad_ends_at', e.target.value ? new Date(e.target.value).toISOString() : null)}
-                    className="bg-background"
-                  />
-                </div>
+                {(editProduct.is_homepage_banner || editProduct.is_sponsored) && (
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                    <div className="space-y-2">
+                      <Label>{t('admin.banner.priority')}</Label>
+                      <Input
+                        type="number"
+                        min={0}
+                        max={MAX_AD_PRIORITY}
+                        value={editProduct.ad_priority ?? 0}
+                        onChange={(e) => updateField('ad_priority', clampPriority(e.target.value))}
+                        className="bg-background"
+                      />
+                      <p className="text-xs text-muted">{t('admin.product.adPriorityDesc')}</p>
+                    </div>
+                    <div className="space-y-2">
+                      <Label>{t('admin.banner.startsAt')}</Label>
+                      <Input
+                        type="datetime-local"
+                        value={toLocalInputValue(editProduct.ad_starts_at)}
+                        onChange={(e) => updateField('ad_starts_at', fromLocalInputValue(e.target.value))}
+                        className="bg-background"
+                      />
+                      <p className="text-xs text-muted">{t('admin.banner.startsHint')}</p>
+                    </div>
+                    <div className="space-y-2">
+                      <Label>{t('admin.banner.endsAt')}</Label>
+                      <Input
+                        type="datetime-local"
+                        value={toLocalInputValue(editProduct.ad_ends_at)}
+                        min={toLocalInputValue(editProduct.ad_starts_at) || undefined}
+                        onChange={(e) => updateField('ad_ends_at', fromLocalInputValue(e.target.value))}
+                        className="bg-background"
+                      />
+                      <p className="text-xs text-muted">{t('admin.banner.endsHint')}</p>
+                    </div>
+                  </div>
+                )}
 
-                {(editProduct.is_homepage_banner) && (
+                {editProduct.is_homepage_banner && (
                   <>
                     <div className="space-y-2">
-                      <Label>Banner Image URL (optional)</Label>
+                      <Label>{t('admin.product.bannerImage')}</Label>
                       <Input
                         value={editProduct.banner_image_url ?? ''}
                         onChange={(e) => updateField('banner_image_url', e.target.value || null)}
                         className="bg-background"
-                        placeholder="Leave blank to use product image"
+                        placeholder={t('admin.product.bannerImagePh')}
+                        dir="ltr"
                       />
                     </div>
                     <div className="space-y-2">
-                      <Label>Banner Headline (optional)</Label>
+                      <Label>{t('admin.product.bannerHeadline')}</Label>
                       <Input
                         value={editProduct.banner_headline ?? ''}
                         onChange={(e) => updateField('banner_headline', e.target.value || null)}
                         className="bg-background"
-                        placeholder="Leave blank to use product title"
+                        placeholder={t('admin.product.bannerHeadlinePh')}
                       />
                     </div>
                     <div className="space-y-2">
-                      <Label>Banner Subtext (optional)</Label>
-                      <Input
+                      <Label>{t('admin.product.bannerSubtext')}</Label>
+                      <Textarea
                         value={editProduct.banner_subtext ?? ''}
                         onChange={(e) => updateField('banner_subtext', e.target.value || null)}
-                        className="bg-background"
-                        placeholder="Leave blank to use short description"
+                        className="bg-background min-h-[64px]"
+                        placeholder={t('admin.product.bannerSubtextPh')}
                       />
+                    </div>
+
+                    {/* Live preview of the slide */}
+                    <div className="space-y-2">
+                      <Label>{t('admin.banner.preview')}</Label>
+                      <div className="relative aspect-[16/6] overflow-hidden rounded-md bg-surface-elevated">
+                        {(editProduct.banner_image_url || editProduct.images?.[0]) ? (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img
+                            src={editProduct.banner_image_url || editProduct.images?.[0]}
+                            alt=""
+                            className="absolute inset-0 h-full w-full object-cover"
+                          />
+                        ) : (
+                          <div className="absolute inset-0 flex items-center justify-center text-muted">
+                            <ImageOff className="w-6 h-6" />
+                          </div>
+                        )}
+                        <div className="absolute inset-0 bg-gradient-to-t from-background via-background/40 to-transparent" />
+                        <div className="absolute bottom-0 start-0 p-4 max-w-[80%]">
+                          <p className="font-heading text-lg font-bold text-text leading-tight line-clamp-2">
+                            {editProduct.banner_headline || editProduct.title || t('admin.banner.previewHeadline')}
+                          </p>
+                          {(editProduct.banner_subtext || editProduct.short_description) && (
+                            <p className="text-xs text-muted mt-1 line-clamp-2">
+                              {editProduct.banner_subtext || editProduct.short_description}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                      {!editProduct.is_published && (
+                        <p className="text-xs text-danger">{t('admin.banner.unpublishedHint')}</p>
+                      )}
+                      <Link href="/admin/banners" className="inline-block text-xs text-gold hover:underline">
+                        {t('admin.banner.manageAll')}
+                      </Link>
                     </div>
                   </>
                 )}
-              </div>
+              </section>
             </div>
           )}
 
+          {saveError && (
+            <p className="text-sm text-danger flex items-center gap-2" role="alert">
+              <AlertCircle className="w-4 h-4 shrink-0" />
+              {saveError}
+            </p>
+          )}
+
           <DialogFooter>
-            <Button variant="outline" onClick={() => setIsDialogOpen(false)}>Cancel</Button>
+            <Button variant="outline" onClick={() => setIsDialogOpen(false)}>{t('admin.common.cancel')}</Button>
             <Button onClick={handleSave} disabled={saving} className="gold-button">
-              {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Save'}
+              {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : t('admin.common.save')}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -615,13 +791,13 @@ export default function AdminInventoryPage() {
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <AlertCircle className="w-5 h-5 text-danger" />
-              Delete Product
+              {t('admin.inventory.deleteTitle')}
             </DialogTitle>
           </DialogHeader>
-          <p className="text-muted py-4">Are you sure you want to delete this product? This action cannot be undone.</p>
+          <p className="text-muted py-4">{t('admin.inventory.deleteConfirm')}</p>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setDeleteId(null)}>Cancel</Button>
-            <Button variant="destructive" onClick={handleDelete}>Delete</Button>
+            <Button variant="outline" onClick={() => setDeleteId(null)}>{t('admin.common.cancel')}</Button>
+            <Button variant="destructive" onClick={handleDelete}>{t('admin.common.delete')}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

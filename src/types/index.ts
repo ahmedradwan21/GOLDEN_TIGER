@@ -2,6 +2,7 @@ export interface Category {
   id: string;
   slug: string;
   name: string;
+  nameAr?: string;
   parentId: string | null;
   image: string;
   subcategories: Category[];
@@ -11,6 +12,7 @@ export interface Product {
   id: string;
   slug: string;
   title: string;
+  titleAr?: string;
   brand: string;
   price: number; // integer cents
   compareAtPrice?: number; // integer cents
@@ -21,6 +23,7 @@ export interface Product {
   videoUrls: string[];
   features: string[];
   description: string; // two paragraphs separated by \n\n
+  descriptionAr?: string;
   specifications: Record<string, string>;
   tags: string[];
   categoryId: string;
@@ -39,6 +42,7 @@ export interface CartItemSnapshot {
   id: string;
   slug: string;
   title: string;
+  titleAr?: string;
   image: string;
   unitPrice: number; // integer cents
   stock: number;
@@ -85,6 +89,8 @@ export interface HeroSlide {
   id: string;
   image: string;
   headline: string;
+  /** Arabic headline when the banner has no custom headline (product title_ar). */
+  headlineAr?: string | null;
   subcopy: string;
   ctaText: string;
   ctaHref: string;
@@ -122,7 +128,7 @@ export interface SearchResponse {
   organic: Product[];
   total: number;
   facets: {
-    categories: { slug: string; name: string; count: number }[];
+    categories: { slug: string; name: string; nameAr?: string; count: number }[];
     tags: { tag: string; count: number }[];
     priceRange: { min: number; max: number };
     ratings: { min: number; count: number }[];
@@ -145,6 +151,9 @@ export interface ProductCardData {
 }
 
 export interface Coupon {
+  titleEn?: string | null;
+  titleAr?: string | null;
+  imageUrl?: string | null;
   id: string;
   code: string;
   discountType: 'percentage' | 'fixed';

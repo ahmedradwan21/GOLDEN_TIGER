@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
-import { supabase } from '@/lib/db';
+import { supabaseAdmin } from '@/lib/db-admin';
 import { getSession } from '@/lib/auth/session';
 
 const startSchema = z.object({
@@ -12,6 +12,14 @@ const startSchema = z.object({
   ).min(1).max(100),
   sessionId: z.string().min(1),
 });
+
+function dbFail(step: string, error: { message: string; code?: string } | null) {
+  console.error(`[checkout] ${step} failed:`, error?.code, error?.message);
+  return NextResponse.json(
+    { error: `Database error during ${step}: ${error?.message ?? 'unknown error'} (possible RLS rejection)`, code: error?.code ?? null },
+    { status: 500 }
+  );
+}
 
 export async function POST(req: NextRequest) {
   try {
@@ -25,19 +33,21 @@ export async function POST(req: NextRequest) {
     const session = await getSession();
 
     const cutoff = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
-    const { data: existing } = await supabase
+    const { data: existing, error: existingError } = await supabaseAdmin
       .from('orders')
       .select('id, session_id, status, checkout_started_at')
       .eq('session_id', sessionId)
       .eq('status', 'CHECKOUT_STARTED')
       .gte('checkout_started_at', cutoff)
       .maybeSingle();
+    if (existingError) return dbFail('orders select', existingError);
 
     const productIds = items.map((i) => i.productId);
-    const { data: products } = await supabase
+    const { data: products, error: productsError } = await supabaseAdmin
       .from('products')
       .select('id, title, images, price_cents')
       .in('id', productIds);
+    if (productsError) return dbFail('products select', productsError);
 
     const productMap = new Map((products ?? []).map((p: { id: string; title: string; images: string[]; price_cents: number }) => [p.id, p]));
     const orderItems = items.map((i) => {
@@ -54,8 +64,9 @@ export async function POST(req: NextRequest) {
     const subtotal = orderItems.reduce((sum, i) => sum + i.unit_price_cents * i.quantity, 0);
 
     if (existing) {
-      await supabase.from('order_items').delete().eq('order_id', existing.id);
-      await supabase
+      const { error: delError } = await supabaseAdmin.from('order_items').delete().eq('order_id', existing.id);
+      if (delError) return dbFail('order_items delete', delError);
+      const { error: updError } = await supabaseAdmin
         .from('orders')
         .update({
           user_id: session?.userId ?? null,
@@ -63,14 +74,16 @@ export async function POST(req: NextRequest) {
           total_cents: subtotal,
         })
         .eq('id', existing.id);
+      if (updError) return dbFail('orders update', updError);
 
       const itemsWithOrderId = orderItems.map((i) => ({ ...i, order_id: existing.id }));
-      await supabase.from('order_items').insert(itemsWithOrderId);
+      const { error: insError } = await supabaseAdmin.from('order_items').insert(itemsWithOrderId);
+      if (insError) return dbFail('order_items insert', insError);
 
       return NextResponse.json({ orderId: existing.id });
     }
 
-    const { data: order, error } = await supabase
+    const { data: order, error } = await supabaseAdmin
       .from('orders')
       .insert({
         session_id: sessionId,
@@ -83,15 +96,15 @@ export async function POST(req: NextRequest) {
       .select('id')
       .single();
 
-    if (error || !order) {
-      return NextResponse.json({ error: 'Something went wrong' }, { status: 500 });
-    }
+    if (error || !order) return dbFail('orders insert', error);
 
     const itemsWithOrderId = orderItems.map((i) => ({ ...i, order_id: order.id }));
-    await supabase.from('order_items').insert(itemsWithOrderId);
+    const { error: itemsError } = await supabaseAdmin.from('order_items').insert(itemsWithOrderId);
+    if (itemsError) return dbFail('order_items insert', itemsError);
 
     return NextResponse.json({ orderId: order.id });
-  } catch {
-    return NextResponse.json({ error: 'Something went wrong' }, { status: 500 });
+  } catch (err) {
+    console.error('[checkout] Unexpected error:', err);
+    return NextResponse.json({ error: `Unexpected checkout error: ${err instanceof Error ? err.message : String(err)}` }, { status: 500 });
   }
 }

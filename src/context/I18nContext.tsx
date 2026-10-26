@@ -1,6 +1,7 @@
 'use client';
 
 import { createContext, useContext, useEffect, useState, useCallback } from 'react';
+import { adminDict } from '@/lib/admin-i18n';
 
 type Locale = 'en' | 'ar';
 
@@ -8,7 +9,7 @@ interface I18nContextValue {
   locale: Locale;
   setLocale: (locale: Locale) => void;
   toggleLocale: () => void;
-  t: (key: string, vars?: Record<string, string | number>) => string;
+  t: (key: string) => string;
   dir: 'ltr' | 'rtl';
 }
 
@@ -282,6 +283,16 @@ const dict: Record<Locale, Record<string, string>> = {
     'login.createOne': 'Create one',
     'auth.toast.welcomeBack': 'Welcome back!',
     'auth.toast.loginFailed': 'Login failed',
+    'auth.showPassword': 'Show password',
+    'auth.hidePassword': 'Hide password',
+    'auth.error.emailNotRegistered': 'This email is not registered.',
+    'auth.error.wrongPassword': 'Wrong password. Please try again.',
+    'auth.error.emailAlreadyRegistered': 'This email is already registered.',
+    'auth.error.invalidInput': 'Please check your email and password.',
+    'auth.error.rateLimited': 'Too many attempts. Please try again later.',
+    'auth.error.network': 'Network error. Please try again.',
+    'auth.error.server': 'Something went wrong. Please try again.',
+    'auth.goToLogin': 'Go to login',
 
     'register.title': 'Create Account',
     'register.subtitle': 'Join The Golden Tiger for a premium shopping experience.',
@@ -549,6 +560,101 @@ const dict: Record<Locale, Record<string, string>> = {
     'admin.careers.noApplications': 'No applications yet.',
     'admin.careers.noJobs': 'No job postings yet.',
     'admin.careers.deleteConfirm': 'Delete this job posting? All applications will also be removed.',
+    'brand.name': 'The Golden Tiger',
+    'card.ticker.freeDelivery': '🚚 Free delivery',
+    'card.ticker.topInCategory': '⭐ #1 in category',
+    'card.ticker.soldRecently': '🔥 1500+ sold recently',
+    'card.badge.bestseller': 'Bestseller',
+    'card.badge.topPicks': 'Top Picks',
+    'gallery.prev': 'Previous image',
+    'gallery.next': 'Next image',
+    'gallery.imageOf': 'image {n} of {total}',
+    'gallery.noImage': 'No image available',
+    'gallery.openFullscreen': 'Open fullscreen',
+    'gallery.closeFullscreen': 'Close fullscreen',
+    'gallery.viewImage': 'View image',
+    'gallery.viewVideo': 'View video',
+    'gallery.videoThumb': 'Video thumbnail',
+    'gallery.playVideo': 'Play video',
+    'product.tabs.ariaLabel': 'Product information',
+    'product.related': 'Related Products',
+    'product.recentlyViewed': 'Recently Viewed',
+    'slider.seeAll': 'See all',
+    'slider.scrollLeft': 'Scroll left',
+    'slider.scrollRight': 'Scroll right',
+    'reviews.title': 'Customer Reviews',
+    'reviews.write': 'Write a Review',
+    'reviews.yourRating': 'Your Rating',
+    'reviews.yourName': 'Your Name',
+    'reviews.yourReview': 'Your Review',
+    'reviews.rateStars': 'Rate {n} stars',
+    'reviews.namePlaceholder': 'John Doe',
+    'reviews.commentPlaceholder': 'Share your experience with this product...',
+    'reviews.success': 'Review submitted successfully!',
+    'reviews.submit': 'Submit Review',
+    'reviews.empty': 'No reviews yet. Be the first to share your thoughts!',
+    'reviews.adminReply': 'Golden Tiger Shield Reply',
+    'reviews.err.rating': 'Please select a star rating.',
+    'reviews.err.name': 'Please enter your name.',
+    'reviews.err.comment': 'Please write a comment.',
+    'reviews.err.failed': 'Failed to submit review.',
+    'reviews.err.network': 'Network error. Please try again.',
+    'loyalty.tier.bronzeDesc': '10% off your next order',
+    'loyalty.tier.silverDesc': '20% off your next order',
+    'loyalty.tier.goldDesc': '30% off + free shipping',
+    'loyalty.err.redeem': 'Failed to redeem',
+    'loyalty.err.redeemPoints': 'Failed to redeem points',
+    'loyalty.toast.redeemed': 'Redeemed {tier}! Your coupon code: {code}',
+    'loyalty.youHave': 'You have',
+    'loyalty.pointsExchange': 'points. Exchange them for premium coupons!',
+    'loyalty.code': 'Code:',
+    'loyalty.percentOffNext': '{value}% off your next order',
+    'loyalty.saveNext': 'Save with this coupon on your next order',
+    'placeholder.email': 'john@example.com',
+    'placeholder.fullName': 'John Doe',
+    'placeholder.address1': '123 Main Street',
+    'placeholder.address2': 'Apartment, suite, etc.',
+    'placeholder.city': 'New York',
+    'placeholder.state': 'NY',
+    'minicart.aria': 'Shopping cart',
+    'minicart.close': 'Close cart',
+    'minicart.empty': 'Your cart is empty',
+    'minicart.startShopping': 'Start Shopping',
+    'minicart.maxReached': 'Max quantity reached',
+    'minicart.viewCart': 'View Cart',
+    'checkout.err.fullName': 'Full name is required',
+    'checkout.err.email': 'Valid email is required',
+    'checkout.err.phone': 'Valid phone number is required',
+    'checkout.err.address': 'Address is required',
+    'checkout.err.city': 'City is required',
+    'checkout.err.state': 'State/Region is required',
+    'checkout.err.postal': 'Postal code is required',
+    'checkout.err.country': 'Country is required',
+    'checkout.err.fixBelow': 'Please fix the errors below.',
+    'checkout.err.nameOnCard': 'Name on card is required.',
+    'checkout.err.cardDigits': 'Card number must be 16 digits.',
+    'checkout.err.cardInvalid': 'Invalid card number. Please check and try again.',
+    'checkout.err.expiry': 'Expiry must be in MM/YY format.',
+    'checkout.err.cvc': 'CVC must be 3 or 4 digits.',
+    'checkout.err.stockItem': '{title} (only {available} available, you requested {requested})',
+    'checkout.err.outOfStock': 'Some items are out of stock',
+    'checkout.err.stockIssue': 'Stock issue:',
+    'checkout.err.noLongerAvailable': 'Some items are no longer available:',
+    'checkout.paymentSuccess': 'Payment successful! Redirecting...',
+    'delivery.standard.name': 'Standard Shipping',
+    'delivery.standard.desc': '5-7 business days',
+    'delivery.express.name': 'Express Shipping',
+    'delivery.express.desc': '2-3 business days',
+    'delivery.next-day.name': 'Next-Day Delivery',
+    'delivery.next-day.desc': '1 business day',
+    'country.United States': 'United States',
+    'country.Canada': 'Canada',
+    'country.United Kingdom': 'United Kingdom',
+    'country.Australia': 'Australia',
+    'country.Germany': 'Germany',
+    'country.France': 'France',
+    'country.Japan': 'Japan',
+    'country.India': 'India',
   },
   ar: {
     'nav.home': 'الرئيسية',
@@ -815,6 +921,16 @@ const dict: Record<Locale, Record<string, string>> = {
     'login.createOne': 'أنشئ واحداً',
     'auth.toast.welcomeBack': 'مرحباً بعودتك!',
     'auth.toast.loginFailed': 'فشل تسجيل الدخول',
+    'auth.showPassword': 'إظهار كلمة المرور',
+    'auth.hidePassword': 'إخفاء كلمة المرور',
+    'auth.error.emailNotRegistered': 'هذا البريد الإلكتروني غير مسجل.',
+    'auth.error.wrongPassword': 'كلمة المرور غير صحيحة. يرجى المحاولة مرة أخرى.',
+    'auth.error.emailAlreadyRegistered': 'هذا البريد الإلكتروني مسجل بالفعل.',
+    'auth.error.invalidInput': 'يرجى التحقق من البريد الإلكتروني وكلمة المرور.',
+    'auth.error.rateLimited': 'محاولات كثيرة جداً. يرجى المحاولة لاحقاً.',
+    'auth.error.network': 'خطأ في الشبكة. يرجى المحاولة مرة أخرى.',
+    'auth.error.server': 'حدث خطأ. يرجى المحاولة مرة أخرى.',
+    'auth.goToLogin': 'الانتقال إلى تسجيل الدخول',
 
     'register.title': 'إنشاء حساب',
     'register.subtitle': 'انضم إلى النمر الذهبي لتجربة تسوق مميزة.',
@@ -1082,11 +1198,106 @@ const dict: Record<Locale, Record<string, string>> = {
     'admin.careers.noApplications': 'لا توجد طلبات بعد.',
     'admin.careers.noJobs': 'لا توجد وظائف شاغرة بعد.',
     'admin.careers.deleteConfirm': 'حذف هذه الوظيفة؟ سيتم حذف جميع الطلبات أيضاً.',
+    'brand.name': 'النمر الذهبي',
+    'card.ticker.freeDelivery': '🚚 توصيل مجاني',
+    'card.ticker.topInCategory': '⭐ #1 في الفئة',
+    'card.ticker.soldRecently': '🔥 تم بيع +1500 مؤخراً',
+    'card.badge.bestseller': 'الأكثر مبيعاً',
+    'card.badge.topPicks': 'أفضل المنتجات',
+    'gallery.prev': 'الصورة السابقة',
+    'gallery.next': 'الصورة التالية',
+    'gallery.imageOf': 'صورة {n} من {total}',
+    'gallery.noImage': 'لا توجد صورة',
+    'gallery.openFullscreen': 'عرض بملء الشاشة',
+    'gallery.closeFullscreen': 'إغلاق ملء الشاشة',
+    'gallery.viewImage': 'عرض الصورة',
+    'gallery.viewVideo': 'عرض الفيديو',
+    'gallery.videoThumb': 'صورة مصغرة للفيديو',
+    'gallery.playVideo': 'تشغيل الفيديو',
+    'product.tabs.ariaLabel': 'معلومات المنتج',
+    'product.related': 'منتجات ذات صلة',
+    'product.recentlyViewed': 'شوهدت مؤخراً',
+    'slider.seeAll': 'عرض الكل',
+    'slider.scrollLeft': 'تمرير لليسار',
+    'slider.scrollRight': 'تمرير لليمين',
+    'reviews.title': 'آراء العملاء',
+    'reviews.write': 'اكتب تقييماً',
+    'reviews.yourRating': 'تقييمك',
+    'reviews.yourName': 'اسمك',
+    'reviews.yourReview': 'مراجعتك',
+    'reviews.rateStars': 'تقييم {n} نجوم',
+    'reviews.namePlaceholder': 'محمد أحمد',
+    'reviews.commentPlaceholder': 'شارك تجربتك مع هذا المنتج...',
+    'reviews.success': 'تم إرسال تقييمك بنجاح!',
+    'reviews.submit': 'إرسال التقييم',
+    'reviews.empty': 'لا توجد تقييمات بعد. كن أول من يشارك رأيه!',
+    'reviews.adminReply': 'رد فريق النمر الذهبي',
+    'reviews.err.rating': 'يرجى اختيار عدد النجوم.',
+    'reviews.err.name': 'يرجى إدخال اسمك.',
+    'reviews.err.comment': 'يرجى كتابة تعليق.',
+    'reviews.err.failed': 'تعذّر إرسال التقييم.',
+    'reviews.err.network': 'خطأ في الاتصال. يرجى المحاولة مرة أخرى.',
+    'loyalty.tier.bronzeDesc': 'خصم 10% على طلبك القادم',
+    'loyalty.tier.silverDesc': 'خصم 20% على طلبك القادم',
+    'loyalty.tier.goldDesc': 'خصم 30% + شحن مجاني',
+    'loyalty.err.redeem': 'تعذّر الاستبدال',
+    'loyalty.err.redeemPoints': 'تعذّر استبدال النقاط',
+    'loyalty.toast.redeemed': 'تم استبدال {tier}! كود القسيمة: {code}',
+    'loyalty.youHave': 'لديك',
+    'loyalty.pointsExchange': 'نقطة. استبدلها بقسائم مميزة!',
+    'loyalty.code': 'الكود:',
+    'loyalty.percentOffNext': 'خصم {value}% على طلبك القادم',
+    'loyalty.saveNext': 'وفّر بهذه القسيمة على طلبك القادم',
+    'placeholder.email': 'name@example.com',
+    'placeholder.fullName': 'محمد أحمد',
+    'placeholder.address1': '123 شارع التحرير',
+    'placeholder.address2': 'شقة، جناح، إلخ.',
+    'placeholder.city': 'القاهرة',
+    'placeholder.state': 'المحافظة',
+    'minicart.aria': 'سلة التسوق',
+    'minicart.close': 'إغلاق السلة',
+    'minicart.empty': 'سلة التسوق فارغة',
+    'minicart.startShopping': 'ابدأ التسوق',
+    'minicart.maxReached': 'تم الوصول للحد الأقصى للكمية',
+    'minicart.viewCart': 'عرض السلة',
+    'checkout.err.fullName': 'الاسم الكامل مطلوب',
+    'checkout.err.email': 'يرجى إدخال بريد إلكتروني صحيح',
+    'checkout.err.phone': 'يرجى إدخال رقم هاتف صحيح',
+    'checkout.err.address': 'العنوان مطلوب',
+    'checkout.err.city': 'المدينة مطلوبة',
+    'checkout.err.state': 'المحافظة/المنطقة مطلوبة',
+    'checkout.err.postal': 'الرمز البريدي مطلوب',
+    'checkout.err.country': 'الدولة مطلوبة',
+    'checkout.err.fixBelow': 'يرجى تصحيح الأخطاء أدناه.',
+    'checkout.err.nameOnCard': 'الاسم على البطاقة مطلوب.',
+    'checkout.err.cardDigits': 'يجب أن يتكون رقم البطاقة من 16 رقماً.',
+    'checkout.err.cardInvalid': 'رقم البطاقة غير صحيح. يرجى التحقق والمحاولة مرة أخرى.',
+    'checkout.err.expiry': 'يجب أن يكون تاريخ الانتهاء بصيغة MM/YY.',
+    'checkout.err.cvc': 'يجب أن يتكون رمز CVC من 3 أو 4 أرقام.',
+    'checkout.err.stockItem': '{title} (المتاح {available} فقط، وطلبت {requested})',
+    'checkout.err.outOfStock': 'بعض المنتجات غير متوفرة',
+    'checkout.err.stockIssue': 'مشكلة في المخزون:',
+    'checkout.err.noLongerAvailable': 'بعض المنتجات لم تعد متوفرة:',
+    'checkout.paymentSuccess': 'تم الدفع بنجاح! جارٍ التحويل...',
+    'delivery.standard.name': 'الشحن العادي',
+    'delivery.standard.desc': '5-7 أيام عمل',
+    'delivery.express.name': 'الشحن السريع',
+    'delivery.express.desc': '2-3 أيام عمل',
+    'delivery.next-day.name': 'التوصيل في اليوم التالي',
+    'delivery.next-day.desc': 'يوم عمل واحد',
+    'country.United States': 'الولايات المتحدة',
+    'country.Canada': 'كندا',
+    'country.United Kingdom': 'المملكة المتحدة',
+    'country.Australia': 'أستراليا',
+    'country.Germany': 'ألمانيا',
+    'country.France': 'فرنسا',
+    'country.Japan': 'اليابان',
+    'country.India': 'الهند',
   },
 };
 
-export function I18nProvider({ children, initialLocale = 'en' }: { children: React.ReactNode; initialLocale?: Locale }) {
-  const [locale, setLocaleState] = useState<Locale>(initialLocale);
+export function I18nProvider({ children }: { children: React.ReactNode }) {
+  const [locale, setLocaleState] = useState<Locale>('en');
 
   useEffect(() => {
     const stored = localStorage.getItem(STORAGE_KEY) as Locale | null;
@@ -1104,27 +1315,19 @@ export function I18nProvider({ children, initialLocale = 'en' }: { children: Rea
   const setLocale = useCallback((l: Locale) => {
     setLocaleState(l);
     localStorage.setItem(STORAGE_KEY, l);
-    document.cookie = `${STORAGE_KEY}=${l}; path=/; max-age=31536000; samesite=lax`;
   }, []);
 
   const toggleLocale = useCallback(() => {
     setLocaleState((prev) => {
       const next = prev === 'en' ? 'ar' : 'en';
       localStorage.setItem(STORAGE_KEY, next);
-      document.cookie = `${STORAGE_KEY}=${next}; path=/; max-age=31536000; samesite=lax`;
       return next;
     });
   }, []);
 
   const t = useCallback(
-    (key: string, vars?: Record<string, string | number>) => {
-      let str = dict[locale][key] ?? dict.en[key] ?? key;
-      if (vars) {
-        for (const [k, v] of Object.entries(vars)) {
-          str = str.replace(new RegExp(`\{${k}\}`, 'g'), String(v));
-        }
-      }
-      return str;
+    (key: string) => {
+      return dict[locale][key] ?? adminDict[locale][key] ?? dict.en[key] ?? adminDict.en[key] ?? key;
     },
     [locale]
   );

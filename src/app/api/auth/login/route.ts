@@ -1,9 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
-import { supabase } from '@/lib/db';
+import { supabaseAdmin } from '@/lib/db-admin';
 import { verifyPassword } from '@/lib/auth/password';
 import { createSessionCookie } from '@/lib/auth/session';
-import { checkRateLimit, getClientIp, rateLimitResponse } from '@/lib/rate-limit';
 
 const loginSchema = z.object({
   email: z.string().email(),
@@ -11,27 +10,29 @@ const loginSchema = z.object({
 });
 
 export async function POST(req: NextRequest) {
-  if (!checkRateLimit(`login:${getClientIp(req)}`)) return rateLimitResponse();
   try {
     const body = await req.json();
     const parsed = loginSchema.safeParse(body);
     if (!parsed.success) {
-      return NextResponse.json({ error: 'Invalid input' }, { status: 400 });
+      return NextResponse.json({ error: 'Invalid input', code: 'INVALID_INPUT' }, { status: 400 });
     }
 
     const { email, password } = parsed.data;
-    const { data: user } = await supabase
+    const { data: user, error } = await supabaseAdmin
       .from('users')
       .select('id, email, name, password_hash')
       .eq('email', email)
       .maybeSingle();
+    if (error) {
+      return NextResponse.json({ error: 'Something went wrong. Please try again.', code: 'SERVER_ERROR' }, { status: 500 });
+    }
     if (!user) {
-      return NextResponse.json({ error: 'Invalid email or password' }, { status: 401 });
+      return NextResponse.json({ error: 'This email is not registered.', code: 'EMAIL_NOT_REGISTERED' }, { status: 401 });
     }
 
     const valid = await verifyPassword(password, user.password_hash);
     if (!valid) {
-      return NextResponse.json({ error: 'Invalid email or password' }, { status: 401 });
+      return NextResponse.json({ error: 'Wrong password. Please try again.', code: 'WRONG_PASSWORD' }, { status: 401 });
     }
 
     await createSessionCookie(user.id, user.email);
@@ -39,6 +40,6 @@ export async function POST(req: NextRequest) {
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     console.error('[auth/login] Error:', msg);
-    return NextResponse.json({ error: 'Something went wrong. Please try again.' }, { status: 500 });
+    return NextResponse.json({ error: 'Something went wrong. Please try again.', code: 'SERVER_ERROR' }, { status: 500 });
   }
 }

@@ -2,9 +2,12 @@
 
 import { useState, useRef, useEffect, useCallback } from 'react';
 import Image from 'next/image';
-import { Play, ChevronLeft, ChevronRight, X, ZoomIn } from 'lucide-react';
+import { Play, ChevronLeft, ChevronRight, X, ZoomIn, Package } from 'lucide-react';
 import { SafeImage } from '@/components/ui/SafeImage';
 import { cn } from '@/lib/utils';
+import { normalizeProductImages } from '@/lib/product-images';
+import { useI18n } from '@/context/I18nContext';
+import { pickLocalized } from '@/lib/localize';
 
 interface GalleryMedia {
   type: 'image' | 'video';
@@ -13,9 +16,10 @@ interface GalleryMedia {
 }
 
 interface ProductGalleryProps {
-  images: string[];
-  videoUrls: string[];
+  images?: unknown;
+  videoUrls?: unknown;
   title: string;
+  titleAr?: string;
 }
 
 function getYouTubeThumb(url: string): string {
@@ -24,10 +28,15 @@ function getYouTubeThumb(url: string): string {
   return '';
 }
 
-export function ProductGallery({ images, videoUrls, title }: ProductGalleryProps) {
+export function ProductGallery({ images, videoUrls, title: titleEn, titleAr }: ProductGalleryProps) {
+  const { t, locale } = useI18n();
+  const title = pickLocalized(titleEn, titleAr, locale);
+  const [failedImages, setFailedImages] = useState<string[]>([]);
   const media: GalleryMedia[] = [
-    ...images.map((src) => ({ type: 'image' as const, src })),
-    ...videoUrls.map((url) => ({
+    ...normalizeProductImages(images)
+      .filter((src) => !failedImages.includes(src))
+      .map((src) => ({ type: 'image' as const, src })),
+    ...normalizeProductImages(videoUrls).map((url) => ({
       type: 'video' as const,
       src: url,
       thumbnail: getYouTubeThumb(url),
@@ -41,16 +50,29 @@ export function ProductGallery({ images, videoUrls, title }: ProductGalleryProps
   const mainRef = useRef<HTMLDivElement>(null);
   const touchStartX = useRef<number | null>(null);
 
-  const active = media[activeIndex];
+  const safeIndex = activeIndex < media.length ? activeIndex : 0;
+  const active = media[safeIndex];
   const isVideo = active?.type === 'video';
 
   const goNext = useCallback(() => {
-    setActiveIndex((i) => (i + 1) % media.length);
+    setActiveIndex((i) => media.length ? ((i < media.length ? i : 0) + 1) % media.length : 0);
   }, [media.length]);
 
   const goPrev = useCallback(() => {
-    setActiveIndex((i) => (i - 1 + media.length) % media.length);
+    setActiveIndex((i) => media.length ? ((i < media.length ? i : 0) - 1 + media.length) % media.length : 0);
   }, [media.length]);
+
+  useEffect(() => {
+    if (activeIndex >= media.length) setActiveIndex(0);
+    if (media.length === 0) {
+      setLightboxOpen(false);
+      setZoomed(false);
+    }
+  }, [activeIndex, media.length]);
+
+  function handleImageError(src: string) {
+    setFailedImages((failed) => failed.includes(src) ? failed : [...failed, src]);
+  }
 
   useEffect(() => {
     if (!lightboxOpen) return;
@@ -91,7 +113,7 @@ export function ProductGallery({ images, videoUrls, title }: ProductGalleryProps
       <div
         ref={mainRef}
         className="relative aspect-square rounded-xl overflow-hidden bg-surface-elevated border border-border group"
-        onMouseEnter={() => !isVideo && setZoomed(true)}
+        onMouseEnter={() => active && !isVideo && setZoomed(true)}
         onMouseLeave={() => setZoomed(false)}
         onMouseMove={handleZoomMove}
         onTouchStart={handleTouchStart}
@@ -102,14 +124,20 @@ export function ProductGallery({ images, videoUrls, title }: ProductGalleryProps
         }}
         tabIndex={0}
         role="img"
-        aria-label={`${title} - image ${activeIndex + 1} of ${media.length}`}
+        aria-label={active ? `${title} - ${t('gallery.imageOf').replace('{n}', String(safeIndex + 1)).replace('{total}', String(media.length))}` : `${title} - ${t('gallery.noImage')}`}
       >
-        {isVideo ? (
+        {!active ? (
+          <div className="absolute inset-0 flex items-center justify-center" aria-label={t('gallery.noImage')}>
+            <Package className="h-16 w-16 text-muted" aria-hidden="true" />
+          </div>
+        ) : isVideo ? (
           <VideoFacade url={active.src} thumbnail={active.thumbnail || ''} title={title} />
         ) : (
           <>
             <Image
               src={active.src}
+              unoptimized
+              onError={() => handleImageError(active.src)}
               alt={title}
               fill
               sizes="(max-width: 768px) 100vw, 50vw"
@@ -119,12 +147,12 @@ export function ProductGallery({ images, videoUrls, title }: ProductGalleryProps
                   ? { transformOrigin: `${zoomPos.x}% ${zoomPos.y}%`, transform: 'scale(2)' }
                   : undefined
               }
-              priority={activeIndex === 0}
+              priority={safeIndex === 0}
             />
             <button
               onClick={() => setLightboxOpen(true)}
               className="absolute top-3 right-3 h-9 w-9 rounded-lg bg-surface/80 backdrop-blur-sm border border-border flex items-center justify-center text-text hover:text-gold transition-colors opacity-0 group-hover:opacity-100"
-              aria-label="Open fullscreen"
+              aria-label={t('gallery.openFullscreen')}
             >
               <ZoomIn className="h-4 w-4" />
             </button>
@@ -137,14 +165,14 @@ export function ProductGallery({ images, videoUrls, title }: ProductGalleryProps
             <button
               onClick={goPrev}
               className="absolute left-3 top-1/2 -translate-y-1/2 h-9 w-9 rounded-full bg-surface/80 backdrop-blur-sm border border-border flex items-center justify-center text-text hover:text-gold transition-colors hidden md:flex"
-              aria-label="Previous image"
+              aria-label={t('gallery.prev')}
             >
               <ChevronLeft className="h-5 w-5" />
             </button>
             <button
               onClick={goNext}
               className="absolute right-3 top-1/2 -translate-y-1/2 h-9 w-9 rounded-full bg-surface/80 backdrop-blur-sm border border-border flex items-center justify-center text-text hover:text-gold transition-colors hidden md:flex"
-              aria-label="Next image"
+              aria-label={t('gallery.next')}
             >
               <ChevronRight className="h-5 w-5" />
             </button>
@@ -160,18 +188,18 @@ export function ProductGallery({ images, videoUrls, title }: ProductGalleryProps
             onClick={() => setActiveIndex(index)}
             className={cn(
               'relative shrink-0 h-16 w-16 sm:h-20 sm:w-20 rounded-lg overflow-hidden border-2 transition-all',
-              index === activeIndex
+              index === safeIndex
                 ? 'border-gold ring-1 ring-gold'
                 : 'border-border hover:border-muted'
             )}
-            aria-label={`View ${item.type} ${index + 1}`}
-            aria-current={index === activeIndex}
+            aria-label={`${t(item.type === 'video' ? 'gallery.viewVideo' : 'gallery.viewImage')} ${index + 1}`}
+            aria-current={index === safeIndex}
           >
             {item.type === 'video' ? (
               <>
                 <SafeImage
                   src={item.thumbnail || ''}
-                  alt="Video thumbnail"
+                  alt={t('gallery.videoThumb')}
                   fill
                   sizes="80px"
                   className="object-cover"
@@ -194,7 +222,7 @@ export function ProductGallery({ images, videoUrls, title }: ProductGalleryProps
       </div>
 
       {/* Lightbox */}
-      {lightboxOpen && !isVideo && (
+      {lightboxOpen && active && !isVideo && (
         <div
           className="fixed inset-0 z-[60] bg-background/95 flex items-center justify-center"
           onClick={() => setLightboxOpen(false)}
@@ -202,20 +230,22 @@ export function ProductGallery({ images, videoUrls, title }: ProductGalleryProps
           <button
             onClick={() => setLightboxOpen(false)}
             className="absolute top-4 right-4 h-10 w-10 rounded-full bg-surface border border-border flex items-center justify-center text-text hover:text-gold z-10"
-            aria-label="Close fullscreen"
+            aria-label={t('gallery.closeFullscreen')}
           >
             <X className="h-5 w-5" />
           </button>
           <button
             onClick={(e) => { e.stopPropagation(); goPrev(); }}
             className="absolute left-4 top-1/2 -translate-y-1/2 h-12 w-12 rounded-full bg-surface border border-border flex items-center justify-center text-text hover:text-gold"
-            aria-label="Previous image"
+            aria-label={t('gallery.prev')}
           >
             <ChevronLeft className="h-6 w-6" />
           </button>
           <div className="relative max-w-[90vw] max-h-[85vh] aspect-square" onClick={(e) => e.stopPropagation()}>
             <Image
               src={active.src}
+              unoptimized
+              onError={() => handleImageError(active.src)}
               alt={title}
               fill
               sizes="90vw"
@@ -225,12 +255,12 @@ export function ProductGallery({ images, videoUrls, title }: ProductGalleryProps
           <button
             onClick={(e) => { e.stopPropagation(); goNext(); }}
             className="absolute right-4 top-1/2 -translate-y-1/2 h-12 w-12 rounded-full bg-surface border border-border flex items-center justify-center text-text hover:text-gold"
-            aria-label="Next image"
+            aria-label={t('gallery.next')}
           >
             <ChevronRight className="h-6 w-6" />
           </button>
           <span className="absolute bottom-4 left-1/2 -translate-x-1/2 text-sm text-muted">
-            {activeIndex + 1} / {media.length}
+            {safeIndex + 1} / {media.length}
           </span>
         </div>
       )}
@@ -239,6 +269,7 @@ export function ProductGallery({ images, videoUrls, title }: ProductGalleryProps
 }
 
 function VideoFacade({ url, thumbnail, title }: { url: string; thumbnail: string; title: string }) {
+  const { t } = useI18n();
   const [loaded, setLoaded] = useState(false);
   const embedUrl = convertToEmbedUrl(url);
 
@@ -260,7 +291,7 @@ function VideoFacade({ url, thumbnail, title }: { url: string; thumbnail: string
     <button
       onClick={() => setLoaded(true)}
       className="relative w-full h-full flex items-center justify-center group"
-      aria-label="Play video"
+      aria-label={t('gallery.playVideo')}
     >
       {thumbnail && (
         <Image

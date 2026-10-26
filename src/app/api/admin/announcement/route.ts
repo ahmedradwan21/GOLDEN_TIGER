@@ -1,75 +1,45 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { z } from 'zod';
-import { supabaseAdmin } from '@/lib/db';
 import { getAdminSession } from '@/lib/auth/session';
+import { supabaseAdmin } from '@/lib/db-admin';
+import { toAnnouncementSettings, validateAnnouncementInput } from '@/lib/announcement';
 
-const settingsId = 'main';
-
-const settingsSchema = z.object({
-  is_enabled: z.boolean(),
-  message_en: z.string().trim().max(300).optional().default(''),
-  message_ar: z.string().trim().max(300).optional().default(''),
-  link_url: z.string().trim().url().refine(
-    (value) => value.startsWith('https://') || value.startsWith('http://'),
-    { message: 'URL must start with http:// or https://' },
-  ).nullable().optional(),
-  background_color: z.string().trim().max(32).optional().default('#0B0B0F'),
-  text_color: z.string().trim().max(32).optional().default('#F5F1E6'),
-  starts_at: z.string().nullable().optional(),
-  ends_at: z.string().nullable().optional(),
-});
+export const dynamic = 'force-dynamic';
 
 export async function GET() {
-  const session = await getAdminSession();
-  if (!session) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
-
+  if (!(await getAdminSession())) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   const { data, error } = await supabaseAdmin
     .from('announcement_bar_settings')
     .select('*')
-    .eq('id', settingsId)
+    .limit(1)
     .maybeSingle();
-
-  if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
-  }
-
-  return NextResponse.json({ settings: data });
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  return NextResponse.json(toAnnouncementSettings(data as Record<string, unknown> | null));
 }
 
 export async function PUT(req: NextRequest) {
-  const session = await getAdminSession();
-  if (!session) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
+  if (!(await getAdminSession())) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-  let body: unknown;
+  let input;
   try {
-    body = await req.json();
+    input = validateAnnouncementInput(await req.json());
   } catch {
-    return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 });
+    input = null;
   }
+  if (!input) return NextResponse.json({ error: 'Invalid announcement fields' }, { status: 400 });
 
-  const parsed = settingsSchema.safeParse(body);
-  if (!parsed.success) {
-    return NextResponse.json(
-      { error: 'Validation failed', details: parsed.error.issues },
-      { status: 400 },
-    );
-  }
+  // Single-row table: update the existing row, or create it if it is missing.
+  const existing = await supabaseAdmin.from('announcement_bar_settings').select('id').limit(1).maybeSingle();
+  if (existing.error) return NextResponse.json({ error: existing.error.message }, { status: 500 });
 
-  const payload = { ...parsed.data, updated_at: new Date().toISOString() };
+  const result = existing.data
+    ? await supabaseAdmin
+        .from('announcement_bar_settings')
+        .update(input)
+        .eq('id', (existing.data as { id: string }).id)
+        .select('*')
+        .single()
+    : await supabaseAdmin.from('announcement_bar_settings').insert(input).select('*').single();
 
-  const { data, error } = await supabaseAdmin
-    .from('announcement_bar_settings')
-    .upsert({ id: settingsId, ...payload })
-    .select('*')
-    .single();
-
-  if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
-  }
-
-  return NextResponse.json({ settings: data });
+  if (result.error) return NextResponse.json({ error: result.error.message }, { status: 400 });
+  return NextResponse.json(toAnnouncementSettings(result.data as Record<string, unknown>));
 }

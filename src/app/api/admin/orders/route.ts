@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { supabase } from '@/lib/db';
+import { supabaseAdmin } from '@/lib/db-admin';
 import { getAdminSession } from '@/lib/auth/session';
 
 export async function GET(req: NextRequest) {
@@ -15,7 +15,7 @@ export async function GET(req: NextRequest) {
   const offset = (page - 1) * limit;
 
   try {
-    let query = supabase
+    let query = supabaseAdmin
       .from('orders')
       .select('id, order_number, session_id, status, email, total_cents, subtotal_cents, tax_cents, shipping_cents, currency, created_at, completed_at, checkout_started_at', { count: 'exact' })
       .order('created_at', { ascending: false })

@@ -17,6 +17,7 @@ import { RecentlyViewed } from '@/components/product/RecentlyViewed';
 import { LoyaltyRewards } from '@/components/product/LoyaltyRewards';
 import { ProductReviews } from '@/components/product/ProductReviews';
 import type { Product } from '@/types';
+import { LocalizedText, T } from '@/components/ui/LocalizedText';
 
 export const revalidate = 300;
 
@@ -65,7 +66,7 @@ export default async function ProductPage({ params }: ProductPageProps) {
   // Build all products list for RecentlyViewed
   const allProducts: Product[] = [];
   for (const cat of categories) {
-    const { products: prods } = await getProductsByCategory(cat.slug);
+    const prods = await getProductsByCategory(cat.slug);
     allProducts.push(...prods);
   }
 
@@ -75,13 +76,13 @@ export default async function ProductPage({ params }: ProductPageProps) {
       <nav aria-label="Breadcrumb" className="flex items-center gap-1.5 text-sm text-muted mb-6 flex-wrap">
         <Link href="/" className="hover:text-gold transition-colors flex items-center gap-1">
           <Home className="h-3.5 w-3.5" />
-          Home
+          <T k="nav.home" />
         </Link>
         {category && (
           <>
             <ChevronRight className="h-3.5 w-3.5" />
             <Link href={`/category/${category.slug}`} className="hover:text-gold transition-colors">
-              {category.name}
+              <LocalizedText en={category.name} ar={category.nameAr} />
             </Link>
           </>
         )}
@@ -89,12 +90,12 @@ export default async function ProductPage({ params }: ProductPageProps) {
           <>
             <ChevronRight className="h-3.5 w-3.5" />
             <Link href={`/category/${subcategory.slug}`} className="hover:text-gold transition-colors">
-              {subcategory.name}
+              <LocalizedText en={subcategory.name} ar={subcategory.nameAr} />
             </Link>
           </>
         )}
         <ChevronRight className="h-3.5 w-3.5" />
-        <span className="text-text font-medium truncate max-w-[200px]">{product.title}</span>
+        <LocalizedText className="text-text font-medium truncate max-w-[200px]" en={product.title} ar={product.titleAr} />
       </nav>
 
       {/* Main product layout */}
@@ -103,6 +104,7 @@ export default async function ProductPage({ params }: ProductPageProps) {
           images={product.images}
           videoUrls={product.videoUrls}
           title={product.title}
+          titleAr={product.titleAr}
         />
         <div className="space-y-6">
           <BuyBox product={product} />
@@ -118,7 +120,7 @@ export default async function ProductPage({ params }: ProductPageProps) {
       {/* Related products */}
       {related.length > 0 && (
         <ProductSlider
-          title="Related Products"
+          titleKey="product.related"
           products={related}
           seeAllHref={category ? `/category/${category.slug}` : undefined}
         />

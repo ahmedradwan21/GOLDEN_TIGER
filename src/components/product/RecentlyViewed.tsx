@@ -27,5 +27,5 @@ export function RecentlyViewed({ currentProductId, allProducts }: { currentProdu
 
   if (recentlyViewed.length === 0) return null;
 
-  return <ProductSlider title="Recently Viewed" products={recentlyViewed} />;
+  return <ProductSlider titleKey="product.recentlyViewed" products={recentlyViewed} />;
 }

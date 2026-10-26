@@ -3,6 +3,7 @@ import type { Product, SearchParams, SearchResponse, ProductCardData } from '@/t
 import { supabase, isDatabaseConfigured } from '@/lib/db';
 import { ensureDatabaseConfigured } from '@/lib/env';
 import { mapProductRow, type ProductRow } from './mappers';
+import { normalizeProductImages } from '@/lib/product-images';
 
 /**
  * Full-text search using Postgres trigram similarity (pg_trgm).
@@ -156,14 +157,14 @@ async function buildFacets(q: string, params: SearchParams): Promise<SearchRespo
   }
 
   const categoryIds = Object.keys(catCounts);
-  let categoryNameMap: Record<string, { slug: string; name: string }> = {};
+  let categoryNameMap: Record<string, { slug: string; name: string; nameAr: string }> = {};
   if (categoryIds.length > 0) {
     const { data: catData } = await supabase
       .from('categories')
-      .select('id, slug, name')
+      .select('*')
       .in('id', categoryIds);
     categoryNameMap = Object.fromEntries(
-      (catData ?? []).map((c: { id: string; slug: string; name: string }) => [c.id, { slug: c.slug, name: c.name }])
+      (catData ?? []).map((c: { id: string; slug: string; name: string; name_ar?: string | null }) => [c.id, { slug: c.slug, name: c.name, nameAr: c.name_ar ?? '' }])
     );
   }
 
@@ -172,6 +173,7 @@ async function buildFacets(q: string, params: SearchParams): Promise<SearchRespo
       .map(([id, c]) => ({
         slug: categoryNameMap[id]?.slug ?? id,
         name: categoryNameMap[id]?.name ?? id,
+        nameAr: categoryNameMap[id]?.nameAr ?? '',
         count: c,
       }))
       .sort((a, b) => b.count - a.count),
@@ -241,7 +243,7 @@ export async function getSuggestions(q: string): Promise<{ title: string; slug: 
     title: d.title,
     slug: d.slug,
     brand: d.brand ?? '',
-    image: d.images?.[0] ?? '',
+    image: normalizeProductImages(d.images)[0] ?? '',
   }));
 }
 

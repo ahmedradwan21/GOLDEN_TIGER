@@ -1,6 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { supabase } from '@/lib/db';
+import { supabaseAdmin } from '@/lib/db-admin';
 import { getAdminSession } from '@/lib/auth/session';
+import { ensureBrand } from '@/lib/brand-admin';
+import { normalizeProductImages } from '@/lib/product-images';
+import { normalizeBannerFields } from '@/lib/homepage-banners';
+import { revalidateHomepage } from '@/lib/revalidate-home';
 
 export async function GET(
   req: NextRequest,
@@ -11,7 +15,7 @@ export async function GET(
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
-  const { data, error } = await supabase
+  const { data, error } = await supabaseAdmin
     .from('products')
     .select('*')
     .eq('id', params.id)
@@ -24,7 +28,7 @@ export async function GET(
     return NextResponse.json({ error: 'Product not found' }, { status: 404 });
   }
 
-  return NextResponse.json(data);
+  return NextResponse.json({ ...data, images: normalizeProductImages(data.images) });
 }
 
 export async function PATCH(
@@ -38,25 +42,30 @@ export async function PATCH(
 
   try {
     const body = await req.json();
+    if ('brand' in body) body.brand = await ensureBrand(body.brand);
     const updateFields: Record<string, unknown> = { updated_at: new Date().toISOString() };
 
     const allowedFields = [
-      'slug', 'title', 'brand', 'sku', 'short_description', 'description',
+      'slug', 'title', 'title_ar', 'description_ar', 'brand', 'sku', 'short_description', 'description',
       'features', 'specifications', 'price_cents', 'compare_at_cents', 'currency',
       'stock', 'images', 'video_urls', 'rating', 'review_count', 'tags',
       'is_published', 'category_id', 'seo_title', 'seo_description', 'seo_keywords',
-      'is_sponsored', 'is_homepage_banner', 'ad_priority',
-      'banner_image_url', 'banner_headline', 'banner_subtext',
-      'ad_starts_at', 'ad_ends_at',
     ];
 
     for (const field of allowedFields) {
       if (field in body) {
-        updateFields[field] = body[field];
+        updateFields[field] = field === 'images' ? normalizeProductImages(body[field]) : body[field];
       }
     }
 
-    const { data, error } = await supabase
+    // Homepage banner / ad fields are validated in one place.
+    const banner = normalizeBannerFields(body);
+    if (banner.error) {
+      return NextResponse.json({ error: banner.error }, { status: 400 });
+    }
+    Object.assign(updateFields, banner.fields);
+
+    const { data, error } = await supabaseAdmin
       .from('products')
       .update(updateFields)
       .eq('id', params.id)
@@ -67,7 +76,8 @@ export async function PATCH(
       return NextResponse.json({ error: error.message }, { status: 400 });
     }
 
-    return NextResponse.json(data);
+    revalidateHomepage();
+    return NextResponse.json({ ...data, images: normalizeProductImages(data?.images) });
   } catch {
     return NextResponse.json({ error: 'Failed to update product' }, { status: 500 });
   }
@@ -82,7 +92,7 @@ export async function DELETE(
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
-  const { error } = await supabase
+  const { error } = await supabaseAdmin
     .from('products')
     .delete()
     .eq('id', params.id);
@@ -91,5 +101,6 @@ export async function DELETE(
     return NextResponse.json({ error: error.message }, { status: 400 });
   }
 
+  revalidateHomepage();
   return NextResponse.json({ success: true });
 }

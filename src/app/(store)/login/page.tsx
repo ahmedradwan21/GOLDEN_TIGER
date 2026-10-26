@@ -4,10 +4,12 @@ import { useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { toast } from 'sonner';
-import { Loader as Loader2, Mail, Lock } from 'lucide-react';
+import { Loader as Loader2, Mail } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { useI18n } from '@/context/I18nContext';
 import { Logo } from '@/components/layout/Logo';
+import { PasswordInput } from '@/components/auth/PasswordInput';
+import { authErrorKey } from '@/lib/auth/errors';
 
 export default function LoginPage() {
   const router = useRouter();
@@ -18,9 +20,11 @@ export default function LoginPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
+  const [errorKey, setErrorKey] = useState<string | null>(null);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+    setErrorKey(null);
     setLoading(true);
     const result = await login(email, password);
     setLoading(false);
@@ -28,7 +32,9 @@ export default function LoginPage() {
       toast.success(t('auth.toast.welcomeBack'));
       router.push(redirect);
     } else {
-      toast.error(result.error ?? t('auth.toast.loginFailed'));
+      const key = authErrorKey(result.code);
+      setErrorKey(key);
+      toast.error(t(key));
     }
   }
 
@@ -53,26 +59,23 @@ export default function LoginPage() {
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   className="w-full h-10 pl-10 pr-3 rounded-lg bg-surface-elevated border border-border text-sm text-text placeholder:text-muted focus-ring"
-                  placeholder="john@example.com"
+                  placeholder={t('placeholder.email')}
                   autoComplete="email"
                 />
               </div>
             </div>
             <div>
-              <label className="block text-xs font-medium text-muted mb-1.5">{t('common.password')}</label>
-              <div className="relative">
-                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted" />
-                <input
-                  type="password"
+              <label htmlFor="login-password" className="block text-xs font-medium text-muted mb-1.5">{t('common.password')}</label>
+                <PasswordInput
+                  id="login-password"
                   required
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  className="w-full h-10 pl-10 pr-3 rounded-lg bg-surface-elevated border border-border text-sm text-text placeholder:text-muted focus-ring"
                   placeholder="••••••••"
                   autoComplete="current-password"
                 />
-              </div>
             </div>
+            {errorKey && <p role="alert" className="text-sm text-destructive">{t(errorKey)}</p>}
             <button
               type="submit"
               disabled={loading}

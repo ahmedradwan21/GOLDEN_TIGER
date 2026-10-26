@@ -5,6 +5,8 @@ const envSchema = z.object({
   NEXT_PUBLIC_SUPABASE_URL: z.string().min(1),
   NEXT_PUBLIC_SUPABASE_ANON_KEY: z.string().min(1),
   JWT_SECRET: z.string().min(1),
+  ADMIN_EMAIL: z.string().email(),
+  ADMIN_PASSWORD: z.string().min(1),
 });
 
 export type Env = z.infer<typeof envSchema>;
@@ -18,6 +20,8 @@ export function loadEnv(): Env {
     NEXT_PUBLIC_SUPABASE_URL: process.env.NEXT_PUBLIC_SUPABASE_URL,
     NEXT_PUBLIC_SUPABASE_ANON_KEY: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
     JWT_SECRET: process.env.JWT_SECRET,
+    ADMIN_EMAIL: process.env.ADMIN_EMAIL,
+    ADMIN_PASSWORD: process.env.ADMIN_PASSWORD,
   });
 
   if (!parsed.success) {

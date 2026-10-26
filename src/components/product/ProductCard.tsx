@@ -8,7 +8,8 @@ import { Rating } from '@/components/ui/Rating';
 import { PriceTag } from '@/components/ui/PriceTag';
 import { useCart } from '@/context/CartContext';
 import { useI18n } from '@/context/I18nContext';
-import { productToSnapshot, getStockHint, discountPercent, cn } from '@/lib/utils';
+import { productToSnapshot, getStockHint, cn } from '@/lib/utils';
+import { productTitle } from '@/lib/localize';
 import { track } from '@/lib/tracker';
 import type { Product } from '@/types';
 
@@ -22,12 +23,12 @@ interface ProductCardProps {
 }
 
 const TICKER_MESSAGES = [
-  { icon: Truck, text: '🚚 توصيل مجاني' },
-  { icon: Star, text: '⭐ #1 في الفئة' },
-  { icon: Flame, text: '🔥 تم بيع +1500 مؤخراً' },
+  { icon: Truck, key: 'card.ticker.freeDelivery' },
+  { icon: Star, key: 'card.ticker.topInCategory' },
+  { icon: Flame, key: 'card.ticker.soldRecently' },
 ];
 
-const BADGE_LABELS = ['الأكثر مبيعاً', 'أفضل المنتجات'];
+const BADGE_LABELS = ['card.badge.bestseller', 'card.badge.topPicks'];
 
 export function ProductCard({
   product,
@@ -37,7 +38,7 @@ export function ProductCard({
   onSelect,
   className,
 }: ProductCardProps) {
-  const { t, dir } = useI18n();
+  const { t, dir, locale } = useI18n();
   const { addItem } = useCart();
   const [hovered, setHovered] = useState(false);
   const [adding, setAdding] = useState(false);
@@ -49,7 +50,7 @@ export function ProductCard({
   const images = product.images.length > 0 ? product.images : [''];
   const outOfStock = product.stock === 0;
   const stockHint = getStockHint(product.stock);
-  const discount = discountPercent(product.price, product.compareAtPrice);
+  const title = productTitle(product, locale);
 
   const nextImage = useCallback(() => {
     setImageIndex((i) => (i + 1) % images.length);
@@ -125,7 +126,7 @@ export function ProductCard({
       {/* Status badges */}
       <div className={cn('absolute top-2 z-20 flex flex-col gap-1', dir === 'rtl' ? 'right-2' : 'left-2')}>
         <span className="bg-tiger-orange text-white text-[0.625rem] font-semibold px-2 py-0.5 rounded-full backdrop-blur-sm">
-          {badgeLabel}
+          {t(badgeLabel)}
         </span>
         {sponsored && (
           <span className="bg-gold/20 text-gold text-[0.625rem] font-semibold px-2 py-0.5 rounded-full backdrop-blur-sm">
@@ -139,13 +140,6 @@ export function ProductCard({
         </span>
       )}
 
-      {/* Discount badge */}
-      {discount !== null && (
-        <span className={cn('absolute z-20 bg-success/90 text-white text-xs font-bold px-2 py-0.5 rounded-full backdrop-blur-sm', dir === 'rtl' ? 'left-2 top-9' : 'right-2 top-9')}>
-          -{discount}%
-        </span>
-      )}
-
       <Link
         href={`/product/${product.slug}`}
         onClick={() => {
@@ -153,7 +147,7 @@ export function ProductCard({
           onSelect?.(product);
         }}
         className="block"
-        aria-label={sponsored ? `${t('home.sponsored')}: ${product.title}` : product.title}
+        aria-label={sponsored ? `${t('home.sponsored')}: ${title}` : title}
       >
         <div className="relative aspect-square overflow-hidden bg-surface-elevated">
           {images.map((img, idx) => (
@@ -166,7 +160,7 @@ export function ProductCard({
             >
               <SafeImage
                 src={img}
-                alt={product.title}
+                alt={title}
                 fill
                 sizes="(max-width: 768px) 50vw, (max-width: 1024px) 33vw, 20vw"
                 className={cn(
@@ -186,7 +180,7 @@ export function ProductCard({
                   'absolute top-1/2 -translate-y-1/2 h-8 w-8 rounded-full bg-surface/80 backdrop-blur-sm flex items-center justify-center text-text opacity-0 group-hover:opacity-100 transition-opacity hover:bg-surface hover:text-gold',
                   dir === 'rtl' ? 'right-2' : 'left-2'
                 )}
-                aria-label="السابق"
+                aria-label={t('gallery.prev')}
               >
                 <ChevronLeft className="h-4 w-4" />
               </button>
@@ -196,7 +190,7 @@ export function ProductCard({
                   'absolute top-1/2 -translate-y-1/2 h-8 w-8 rounded-full bg-surface/80 backdrop-blur-sm flex items-center justify-center text-text opacity-0 group-hover:opacity-100 transition-opacity hover:bg-surface hover:text-gold',
                   dir === 'rtl' ? 'left-2' : 'right-2'
                 )}
-                aria-label="التالي"
+                aria-label={t('gallery.next')}
               >
                 <ChevronRight className="h-4 w-4" />
               </button>
@@ -227,8 +221,8 @@ export function ProductCard({
           onClick={() => onSelect?.(product)}
           className="block"
         >
-          <h3 className={cn('text-sm font-medium text-text line-clamp-2 leading-snug min-h-[2.5rem] hover:text-gold transition-colors', dir === 'rtl' && 'text-right')}>
-            {product.title}
+          <h3 dir="auto" className={cn('text-sm font-medium text-text line-clamp-2 leading-snug min-h-[2.5rem] hover:text-gold transition-colors', dir === 'rtl' && 'text-right')}>
+            {title}
           </h3>
         </Link>
         <Rating rating={product.rating} reviewCount={product.reviewCount} size="sm" />
@@ -245,7 +239,7 @@ export function ProductCard({
             className="flex items-center gap-1 text-[0.625rem] text-tiger-orange font-medium animate-fade-in"
           >
             <CurrentTickerIcon className="h-3 w-3 shrink-0" />
-            <span>{TICKER_MESSAGES[tickerIndex].text}</span>
+            <span>{t(TICKER_MESSAGES[tickerIndex].key)}</span>
           </div>
         </div>
 
@@ -261,7 +255,7 @@ export function ProductCard({
               ? 'bg-surface-elevated text-muted cursor-not-allowed'
               : 'gold-button'
           )}
-          aria-label={`${t('product.addCart')} ${product.title}`}
+          aria-label={`${t('product.addCart')} ${title}`}
         >
           {adding ? (
             <>

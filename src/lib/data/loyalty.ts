@@ -13,6 +13,9 @@ export function calculatePoints(priceCents: number): number {
 }
 
 interface CouponRow {
+  title_en?: string | null;
+  title_ar?: string | null;
+  image_url?: string | null;
   id: string;
   code: string;
   discount_type: string;
@@ -29,6 +32,7 @@ interface CouponRow {
 function mapCouponRow(r: CouponRow): Coupon {
   return {
     id: r.id,
+    titleEn: r.title_en, titleAr: r.title_ar, imageUrl: r.image_url,
     code: r.code,
     discountType: r.discount_type as 'percentage' | 'fixed',
     value: r.value,

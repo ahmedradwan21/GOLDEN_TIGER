@@ -1,9 +1,10 @@
 import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import Link from 'next/link';
-import { ChevronRight, Chrome as Home } from 'lucide-react';
+import { ChevronRight, Home } from 'lucide-react';
 import { SafeImage } from '@/components/ui/SafeImage';
 import { CategoryProducts } from '@/components/product/CategoryProducts';
+import { LocalizedText, T } from '@/components/ui/LocalizedText';
 import {
   getCategoryBySlug,
   getProductsByCategory,
@@ -11,7 +12,6 @@ import {
 
 interface CategoryPageProps {
   params: { slug: string };
-  searchParams: { page?: string };
 }
 
 export async function generateMetadata({ params }: CategoryPageProps): Promise<Metadata> {
@@ -25,15 +25,13 @@ export async function generateMetadata({ params }: CategoryPageProps): Promise<M
   };
 }
 
-export default async function CategoryPage({ params, searchParams }: CategoryPageProps) {
+export default async function CategoryPage({ params }: CategoryPageProps) {
   const category = await getCategoryBySlug(params.slug);
   if (!category) {
     notFound();
   }
 
-  const page = Math.max(1, parseInt(searchParams.page ?? '1', 10) || 1);
-  const { products, total, page: currentPage, pageSize } = await getProductsByCategory(params.slug, page);
-  const totalPages = Math.ceil(total / pageSize);
+  const products = await getProductsByCategory(params.slug);
 
   return (
     <div className="max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8 py-6">
@@ -41,10 +39,10 @@ export default async function CategoryPage({ params, searchParams }: CategoryPag
       <nav aria-label="Breadcrumb" className="flex items-center gap-1.5 text-sm text-muted mb-4">
         <Link href="/" className="hover:text-gold transition-colors flex items-center gap-1">
           <Home className="h-3.5 w-3.5" />
-          Home
+          <T k="nav.home" />
         </Link>
         <ChevronRight className="h-3.5 w-3.5" />
-        <span className="text-text font-medium">{category.name}</span>
+        <LocalizedText className="text-text font-medium" en={category.name} ar={category.nameAr} />
       </nav>
 
       {/* Banner */}
@@ -59,10 +57,10 @@ export default async function CategoryPage({ params, searchParams }: CategoryPag
         <div className="absolute inset-0 bg-gradient-to-t from-background via-background/40 to-transparent" />
         <div className="absolute bottom-0 left-0 right-0 p-6">
           <h1 className="font-heading text-2xl sm:text-4xl font-bold text-text">
-            {category.name}
+            <LocalizedText en={category.name} ar={category.nameAr} />
           </h1>
           <p className="text-sm text-muted mt-1">
-            {total} products available
+            <T k="category.productsAvailable" vars={{ count: products.length }} />
           </p>
         </div>
       </div>
@@ -76,18 +74,13 @@ export default async function CategoryPage({ params, searchParams }: CategoryPag
               href={`/category/${sub.slug}`}
               className="shrink-0 px-4 py-2 rounded-full text-sm font-medium bg-surface-elevated text-muted hover:text-gold hover:border-gold/40 border border-border transition-colors"
             >
-              {sub.name}
+              <LocalizedText en={sub.name} ar={sub.nameAr} />
             </Link>
           ))}
         </div>
       )}
 
-      <CategoryProducts
-        products={products}
-        page={currentPage}
-        totalPages={totalPages}
-        total={total}
-      />
+      <CategoryProducts products={products} />
     </div>
   );
 }

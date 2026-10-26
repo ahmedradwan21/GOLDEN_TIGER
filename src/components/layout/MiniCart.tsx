@@ -8,12 +8,16 @@ import { formatPrice } from '@/lib/pricing';
 import { SafeImage } from '@/components/ui/SafeImage';
 import { QuantityStepper } from '@/components/ui/QuantityStepper';
 import { cn } from '@/lib/utils';
+import { useI18n } from '@/context/I18nContext';
+import { productTitle } from '@/lib/localize';
 
 export function MiniCart() {
   const { items, hydrated, removeItem, incrementItem, decrementItem, closeMiniCart } = useCart();
   const [open, setOpen] = useState(false);
   const [localHydrated, setLocalHydrated] = useState(false);
   const drawerRef = useRef<HTMLDivElement>(null);
+
+  const { t, locale } = useI18n();
 
   useEffect(() => {
     setLocalHydrated(hydrated);
@@ -87,7 +91,7 @@ export function MiniCart() {
         )}
         role="dialog"
         aria-modal="true"
-        aria-label="Shopping cart"
+        aria-label={t('minicart.aria')}
       >
         <div className="flex items-center justify-between p-4 border-b border-border">
           <h2 className="font-heading text-lg font-bold text-text flex items-center gap-2">
@@ -97,7 +101,7 @@ export function MiniCart() {
           <button
             onClick={closeMiniCart}
             className="h-9 w-9 flex items-center justify-center rounded-lg hover:bg-surface-elevated focus-ring"
-            aria-label="Close cart"
+            aria-label={t('minicart.close')}
           >
             <X className="h-5 w-5" />
           </button>
@@ -110,13 +114,13 @@ export function MiniCart() {
         ) : items.length === 0 ? (
           <div className="flex-1 flex flex-col items-center justify-center p-8 text-center">
             <ShoppingBag className="h-12 w-12 text-muted mb-4" />
-            <p className="text-sm text-muted mb-4">Your cart is empty</p>
+            <p className="text-sm text-muted mb-4">{t('minicart.empty')}</p>
             <Link
               href="/"
               onClick={closeMiniCart}
               className="gold-button rounded-lg px-6 py-2.5 text-sm"
             >
-              Start Shopping
+              {t('minicart.startShopping')}
             </Link>
           </div>
         ) : (
@@ -131,7 +135,7 @@ export function MiniCart() {
                   >
                     <SafeImage
                       src={item.image}
-                      alt={item.title}
+                      alt={productTitle(item, locale)}
                       width={64}
                       height={64}
                       className="rounded-lg border border-border"
@@ -143,9 +147,9 @@ export function MiniCart() {
                       onClick={closeMiniCart}
                       className="text-sm font-medium text-text line-clamp-2 hover:text-gold transition-colors"
                     >
-                      {item.title}
+                      {productTitle(item, locale)}
                     </Link>
-                    <p className="text-xs text-muted mt-1">{formatPrice(item.unitPrice)} each</p>
+                    <p className="text-xs text-muted mt-1">{t('cart.each').replace('{price}', formatPrice(item.unitPrice))}</p>
                     <div className="flex items-center justify-between mt-2">
                       <QuantityStepper
                         quantity={item.quantity}
@@ -163,14 +167,14 @@ export function MiniCart() {
                         <button
                           onClick={() => removeItem(item.id)}
                           className="h-7 w-7 flex items-center justify-center rounded text-muted hover:text-danger transition-colors"
-                          aria-label={`Remove ${item.title}`}
+                          aria-label={t('cart.removeAria').replace('{title}', productTitle(item, locale))}
                         >
                           <Trash2 className="h-3.5 w-3.5" />
                         </button>
                       </div>
                     </div>
                     {item.quantity >= Math.min(item.stock, 10) && item.stock > 0 && (
-                      <p className="text-xs text-amber-500 mt-1">Max quantity reached</p>
+                      <p className="text-xs text-amber-500 mt-1">{t('minicart.maxReached')}</p>
                     )}
                   </div>
                 </div>
@@ -179,7 +183,7 @@ export function MiniCart() {
 
             <div className="border-t border-border p-4 space-y-3">
               <div className="flex items-center justify-between">
-                <span className="text-sm text-muted">Subtotal</span>
+                <span className="text-sm text-muted">{t('checkout.subtotal')}</span>
                 <span className="text-lg font-semibold text-text">{formatPrice(subtotal)}</span>
               </div>
               <div className="flex gap-2">
@@ -188,14 +192,14 @@ export function MiniCart() {
                   onClick={closeMiniCart}
                   className="flex-1 h-10 flex items-center justify-center rounded-lg border border-border text-sm font-medium text-text hover:bg-surface-elevated transition-colors"
                 >
-                  View Cart
+                  {t('minicart.viewCart')}
                 </Link>
                 <Link
                   href="/checkout"
                   onClick={closeMiniCart}
                   className="flex-1 h-10 flex items-center justify-center gold-button rounded-lg text-sm"
                 >
-                  Checkout
+                  {t('checkout.title')}
                 </Link>
               </div>
             </div>

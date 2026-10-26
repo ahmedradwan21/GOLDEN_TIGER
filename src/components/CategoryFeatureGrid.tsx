@@ -5,6 +5,7 @@ import { SafeImage } from '@/components/ui/SafeImage';
 import { cn } from '@/lib/utils';
 import { useI18n } from '@/context/I18nContext';
 import type { Category } from '@/types';
+import { categoryName } from '@/lib/localize';
 
 interface CategoryFeature {
   label: string;
@@ -20,16 +21,16 @@ interface CategoryFeatureGridProps {
 }
 
 export function CategoryFeatureGrid({ categories, products, className }: CategoryFeatureGridProps) {
-  const { dir } = useI18n();
+  const { dir, locale } = useI18n();
 
   const features: CategoryFeature[] = categories.slice(0, 4).map((cat) => {
     const product = products.find((p) => p.categoryId === cat.id);
     const image = product?.images[0] ?? cat.image;
     return {
-      label: cat.name,
+      label: categoryName(cat, locale),
       href: `/category/${cat.slug}`,
       image,
-      alt: cat.name,
+      alt: categoryName(cat, locale),
     };
   });
 
@@ -37,10 +38,10 @@ export function CategoryFeatureGrid({ categories, products, className }: Categor
     while (features.length < 4) {
       const cat = categories[features.length % Math.max(categories.length, 1)];
       features.push({
-        label: cat?.name ?? 'الفئة',
+        label: (cat ? categoryName(cat, locale) : ''),
         href: cat ? `/category/${cat.slug}` : '#',
         image: cat?.image ?? '',
-        alt: cat?.name ?? 'الفئة',
+        alt: (cat ? categoryName(cat, locale) : ''),
       });
     }
   }

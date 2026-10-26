@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getAdminSession } from '@/lib/auth/session';
-import { supabase } from '@/lib/db';
+import { supabaseAdmin } from '@/lib/db-admin';
 
 export async function GET() {
   const session = await getAdminSession();
@@ -9,7 +9,7 @@ export async function GET() {
   }
 
   try {
-    const { data, error } = await supabase
+    const { data, error } = await supabaseAdmin
       .from('search_audit_logs')
       .select('query, result_count, created_at')
       .eq('result_count', 0)

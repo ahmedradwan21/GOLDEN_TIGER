@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { supabase } from '@/lib/db';
+import { supabaseAdmin } from '@/lib/db-admin';
 import { getAdminSession } from '@/lib/auth/session';
 
 export async function GET(req: NextRequest) {
@@ -13,7 +13,7 @@ export async function GET(req: NextRequest) {
   const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString();
 
   try {
-    const { data: logs } = await supabase
+    const { data: logs } = await supabaseAdmin
       .from('click_logs')
       .select('event_type, product_id, source, created_at')
       .gte('created_at', since)
@@ -81,7 +81,7 @@ export async function GET(req: NextRequest) {
 
     if (topAdProducts.length > 0) {
       const productIds = topAdProducts.map((p) => p.productId);
-      const { data: productInfo } = await supabase
+      const { data: productInfo } = await supabaseAdmin
         .from('products')
         .select('id, title, slug, is_sponsored, is_homepage_banner')
         .in('id', productIds);

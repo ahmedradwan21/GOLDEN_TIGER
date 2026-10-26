@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { supabase } from '@/lib/db';
+import { supabaseAdmin } from '@/lib/db-admin';
 import { getAdminSession } from '@/lib/auth/session';
 
 export async function GET(req: NextRequest) {
@@ -14,7 +14,7 @@ export async function GET(req: NextRequest) {
   const offset = (page - 1) * limit;
 
   try {
-    const { data, count, error } = await supabase
+    const { data, count, error } = await supabaseAdmin
       .from('product_reviews')
       .select('id, product_id, author_name, rating, comment, is_approved, admin_reply, admin_replied_at, created_at', { count: 'exact' })
       .order('created_at', { ascending: false })
@@ -25,7 +25,7 @@ export async function GET(req: NextRequest) {
     }
 
     const productIds = Array.from(new Set((data ?? []).map((r) => r.product_id)));
-    const { data: products } = await supabase
+    const { data: products } = await supabaseAdmin
       .from('products')
       .select('id, title, slug')
       .in('id', productIds);
@@ -79,7 +79,7 @@ export async function PATCH(req: NextRequest) {
       return NextResponse.json({ error: 'No fields to update' }, { status: 400 });
     }
 
-    const { data, error } = await supabase
+    const { data, error } = await supabaseAdmin
       .from('product_reviews')
       .update(update)
       .eq('id', reviewId)

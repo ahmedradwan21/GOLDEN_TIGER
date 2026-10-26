@@ -23,7 +23,7 @@ export default function AdminLoyaltyPage() {
         const data = await res.json();
         setCustomers(data.customers ?? []);
       } catch {
-        toast.error('Failed to load loyalty data');
+        toast.error(t('admin.loyalty.loadFailed'));
       } finally {
         setLoading(false);
       }
@@ -49,7 +49,7 @@ export default function AdminLoyaltyPage() {
       const data = await res.json();
       toast.success(data.message);
     } catch {
-      toast.error('Failed to generate coupon');
+      toast.error(t('admin.loyalty.couponFailed'));
     } finally {
       setGenerating(null);
     }

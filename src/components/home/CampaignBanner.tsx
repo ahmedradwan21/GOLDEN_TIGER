@@ -70,10 +70,10 @@ export function CampaignBanner() {
     load();
   }, []);
 
-  if (dismissed || campaigns.length === 0) return null;
+  const campaign: ActiveCampaign | undefined = campaigns[0];
+  const countdown = useCountdown(campaign?.endsAt ?? null);
 
-  const campaign = campaigns[0];
-  const countdown = useCountdown(campaign.endsAt);
+  if (dismissed || !campaign) return null;
 
   return (
     <div className="relative bg-gradient-to-r from-tiger-orange via-gold-dark to-gold animate-fade-in">

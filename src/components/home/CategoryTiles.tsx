@@ -5,9 +5,10 @@ import { SafeImage } from '@/components/ui/SafeImage';
 import { useI18n } from '@/context/I18nContext';
 import { cn } from '@/lib/utils';
 import type { Category } from '@/types';
+import { categoryName } from '@/lib/localize';
 
 export function CategoryTiles({ categories }: { categories: Category[] }) {
-  const { t, dir } = useI18n();
+  const { t, dir, locale } = useI18n();
   return (
     <section className="py-8">
       <div className="max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8">
@@ -23,7 +24,7 @@ export function CategoryTiles({ categories }: { categories: Category[] }) {
             >
               <SafeImage
                 src={cat.image}
-                alt={cat.name}
+                alt={categoryName(cat, locale)}
                 fill
                 sizes="(max-width: 768px) 50vw, (max-width: 1024px) 25vw, 12vw"
                 className="object-cover transition-transform duration-500 group-hover:scale-110"
@@ -31,7 +32,7 @@ export function CategoryTiles({ categories }: { categories: Category[] }) {
               <div className="absolute inset-0 bg-gradient-to-t from-background/90 via-background/30 to-transparent" />
               <div className="absolute bottom-0 left-0 right-0 p-2 sm:p-3">
                 <p className="text-xs sm:text-sm font-semibold text-text text-center leading-tight">
-                  {cat.name}
+                  {categoryName(cat, locale)}
                 </p>
               </div>
             </Link>

@@ -14,7 +14,7 @@ interface HeroSliderProps {
 }
 
 export function HeroSlider({ slides, className }: HeroSliderProps) {
-  const { t, dir } = useI18n();
+  const { t, dir, locale } = useI18n();
   const [current, setCurrent] = useState(0);
   const [paused, setPaused] = useState(false);
   const trackRef = useRef<HTMLDivElement>(null);
@@ -78,56 +78,59 @@ export function HeroSlider({ slides, className }: HeroSliderProps) {
         onTouchStart={handleTouchStart}
         onTouchEnd={handleTouchEnd}
       >
-        {slides.map((slide, index) => (
-          <div
-            key={slide.id}
-            className="relative w-full shrink-0"
-            aria-roledescription="slide"
-            aria-label={`${index + 1} of ${slides.length}`}
-            aria-hidden={index !== current}
-          >
-            <div className="relative h-[380px] sm:h-[480px] lg:h-[580px] overflow-hidden">
-              <SafeImage
-                src={slide.image}
-                alt={slide.headline}
-                fill
-                sizes="100vw"
-                className="object-cover"
-                priority={index === 0}
-              />
-              <div className="absolute inset-0 bg-gradient-to-t from-background via-background/50 to-transparent" />
-              <div
-                className={cn(
-                  'absolute inset-0',
-                  dir === 'rtl'
-                    ? 'bg-gradient-to-l from-background/80 via-background/20 to-transparent'
-                    : 'bg-gradient-to-r from-background/80 via-background/20 to-transparent'
-                )}
-              />
-              <div className="absolute bottom-0 left-0 right-0 p-6 sm:p-10 lg:p-16">
-                <div className={cn('max-w-2xl', dir === 'rtl' && 'mr-0 ml-auto text-right')}>
-                  {slide.sponsored && (
-                    <span className="inline-block mb-3 bg-gold/20 text-gold text-xs font-semibold px-2.5 py-1 rounded-full backdrop-blur-sm">
-                      {t('home.sponsored')}
-                    </span>
+        {slides.map((slide, index) => {
+          const headline = locale === 'ar' && slide.headlineAr ? slide.headlineAr : slide.headline;
+          return (
+            <Link
+              key={slide.id}
+              href={slide.ctaHref}
+              className="group relative block w-full shrink-0 focus-ring"
+              aria-roledescription="slide"
+              aria-label={`${headline} (${index + 1} / ${slides.length})`}
+              aria-hidden={index !== current}
+              tabIndex={index === current ? 0 : -1}
+              draggable={false}
+            >
+              <div className="relative h-[380px] sm:h-[480px] lg:h-[580px] overflow-hidden">
+                <SafeImage
+                  src={slide.image}
+                  alt={headline}
+                  fill
+                  sizes="100vw"
+                  className="object-cover transition-transform duration-[1200ms] group-hover:scale-[1.03]"
+                  priority={index === 0}
+                />
+                <div className="absolute inset-0 bg-gradient-to-t from-background via-background/50 to-transparent" />
+                <div
+                  className={cn(
+                    'absolute inset-0',
+                    dir === 'rtl'
+                      ? 'bg-gradient-to-l from-background/80 via-background/20 to-transparent'
+                      : 'bg-gradient-to-r from-background/80 via-background/20 to-transparent'
                   )}
-                  <h2 className="font-heading text-2xl sm:text-4xl lg:text-5xl font-bold text-text mb-3 leading-tight">
-                    {slide.headline}
-                  </h2>
-                  <p className="text-sm sm:text-lg text-muted mb-5 max-w-md">
-                    {slide.subcopy}
-                  </p>
-                  <Link
-                    href={slide.ctaHref}
-                    className="inline-flex items-center justify-center gold-button rounded-lg px-6 py-3 text-sm font-semibold"
-                  >
-                    {slide.ctaText}
-                  </Link>
+                />
+                <div className="absolute bottom-0 left-0 right-0 p-6 sm:p-10 lg:p-16">
+                  <div className={cn('max-w-2xl', dir === 'rtl' && 'mr-0 ml-auto text-right')}>
+                    {slide.sponsored && (
+                      <span className="inline-block mb-3 bg-gold/20 text-gold text-xs font-semibold px-2.5 py-1 rounded-full backdrop-blur-sm">
+                        {t('home.sponsored')}
+                      </span>
+                    )}
+                    <h2 className="font-heading text-2xl sm:text-4xl lg:text-5xl font-bold text-text mb-3 leading-tight">
+                      {headline}
+                    </h2>
+                    {slide.subcopy && (
+                      <p className="text-sm sm:text-lg text-muted mb-5 max-w-md">{slide.subcopy}</p>
+                    )}
+                    <span className="inline-flex items-center justify-center gold-button rounded-lg px-6 py-3 text-sm font-semibold">
+                      {t('campaign.shopNow')}
+                    </span>
+                  </div>
                 </div>
               </div>
-            </div>
-          </div>
-        ))}
+            </Link>
+          );
+        })}
       </div>
 
       {slides.length > 1 && (

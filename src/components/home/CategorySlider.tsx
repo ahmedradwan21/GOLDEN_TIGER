@@ -7,6 +7,7 @@ import { ProductCard } from '@/components/product/ProductCard';
 import { cn } from '@/lib/utils';
 import { useI18n } from '@/context/I18nContext';
 import type { Product, Category } from '@/types';
+import { categoryName } from '@/lib/localize';
 
 interface CategorySliderProps {
   title: string;
@@ -16,7 +17,7 @@ interface CategorySliderProps {
 }
 
 export function CategorySlider({ title, category, products, seeAllHref }: CategorySliderProps) {
-  const { t, dir } = useI18n();
+  const { t, dir, locale } = useI18n();
   const scrollRef = useRef<HTMLDivElement>(null);
   const [activeSub, setActiveSub] = useState<string | null>(null);
 
@@ -39,7 +40,7 @@ export function CategorySlider({ title, category, products, seeAllHref }: Catego
     <section className="py-6">
       <div className="max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8">
         <div className={cn('flex items-center justify-between mb-4', dir === 'rtl' && 'flex-row-reverse')}>
-          <h2 className="font-heading text-xl sm:text-2xl font-bold text-text">{title}</h2>
+          <h2 className="font-heading text-xl sm:text-2xl font-bold text-text">{categoryName({ name: title, nameAr: category.nameAr }, locale)}</h2>
           <Link
             href={seeAllHref}
             className="text-sm text-gold hover:text-gold-light transition-colors"
@@ -72,7 +73,7 @@ export function CategorySlider({ title, category, products, seeAllHref }: Catego
                   : 'bg-surface-elevated text-muted hover:text-text'
               )}
             >
-              {sub.name}
+              {categoryName(sub, locale)}
             </button>
           ))}
         </div>

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
-import { supabaseAdmin } from '@/lib/db';
+import { supabaseAdmin } from '@/lib/db-admin';
 import { verifyPassword } from '@/lib/auth/password';
 import { createAdminCookie } from '@/lib/auth/session';
 

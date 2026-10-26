@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
-import { supabase } from '@/lib/db';
+import { supabaseAdmin } from '@/lib/db-admin';
 import { TAX_RATE } from '@/lib/pricing';
 
 const updateSchema = z.object({
@@ -8,6 +8,14 @@ const updateSchema = z.object({
   shippingAddress: z.record(z.string()).optional(),
   deliveryMethod: z.string().optional(),
 });
+
+function dbFail(step: string, error: { message: string; code?: string } | null) {
+  console.error(`[checkout] ${step} failed:`, error?.code, error?.message);
+  return NextResponse.json(
+    { error: `Database error during ${step}: ${error?.message ?? 'unknown error'} (possible RLS rejection)`, code: error?.code ?? null },
+    { status: 500 }
+  );
+}
 
 export async function PATCH(
   req: NextRequest,
@@ -20,11 +28,12 @@ export async function PATCH(
       return NextResponse.json({ error: 'Invalid input' }, { status: 400 });
     }
 
-    const { data: order } = await supabase
+    const { data: order, error: orderError } = await supabaseAdmin
       .from('orders')
       .select('id, delivery_method')
       .eq('id', params.orderId)
       .maybeSingle();
+    if (orderError) return dbFail('orders select', orderError);
     if (!order) {
       return NextResponse.json({ error: 'Order not found' }, { status: 404 });
     }
@@ -35,10 +44,11 @@ export async function PATCH(
     if (parsed.data.deliveryMethod !== undefined) update.delivery_method = parsed.data.deliveryMethod;
 
     if (parsed.data.deliveryMethod !== undefined) {
-      const { data: items } = await supabase
+      const { data: items, error: itemsError } = await supabaseAdmin
         .from('order_items')
         .select('unit_price_cents, quantity')
         .eq('order_id', params.orderId);
+      if (itemsError) return dbFail('order_items select', itemsError);
 
       const subtotal = (items ?? []).reduce((s: number, i: { unit_price_cents: number; quantity: number }) => s + i.unit_price_cents * i.quantity, 0);
       const tax = Math.round(subtotal * TAX_RATE);
@@ -55,9 +65,12 @@ export async function PATCH(
       update.total_cents = subtotal + tax + shipping;
     }
 
-    await supabase.from('orders').update(update).eq('id', params.orderId);
+    const { data: updated, error: updError } = await supabaseAdmin.from('orders').update(update).eq('id', params.orderId).select('id');
+    if (updError) return dbFail('orders update', updError);
+    if (!updated || updated.length === 0) return dbFail('orders update', { message: 'no rows updated' });
     return NextResponse.json({ success: true });
-  } catch {
-    return NextResponse.json({ error: 'Something went wrong' }, { status: 500 });
+  } catch (err) {
+    console.error('[checkout] Unexpected error:', err);
+    return NextResponse.json({ error: `Unexpected checkout error: ${err instanceof Error ? err.message : String(err)}` }, { status: 500 });
   }
 }
