@@ -1,3 +1,4 @@
+import { serverError } from '@/lib/api/errors';
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/db';
 import { getAdminSession } from '@/lib/auth/session';
@@ -17,7 +18,7 @@ export async function GET(req: NextRequest) {
     .maybeSingle();
 
   if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return serverError(error, 500);
   }
 
   return NextResponse.json({ content: data });
@@ -53,7 +54,7 @@ export async function PUT(req: NextRequest) {
       .maybeSingle();
 
     if (error) {
-      return NextResponse.json({ error: error.message }, { status: 500 });
+      return serverError(error, 500);
     }
 
     return NextResponse.json({ content: data });

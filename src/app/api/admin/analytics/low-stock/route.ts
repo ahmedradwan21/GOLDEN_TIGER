@@ -1,7 +1,12 @@
 import { NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/db-admin';
+import { requireAdmin } from '@/lib/auth/require-admin';
 
 export async function GET() {
+  const auth = await requireAdmin();
+  if (!auth.ok) return auth.response;
+  const session = auth.admin;
+
   try {
     const { data, error } = await supabaseAdmin
       .from('products')

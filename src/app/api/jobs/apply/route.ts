@@ -1,3 +1,4 @@
+import { serverError } from '@/lib/api/errors';
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/db';
 
@@ -24,7 +25,7 @@ export async function POST(req: NextRequest) {
       .single();
 
     if (error) {
-      return NextResponse.json({ error: error.message }, { status: 500 });
+      return serverError(error, 500);
     }
 
     return NextResponse.json({ application: data });

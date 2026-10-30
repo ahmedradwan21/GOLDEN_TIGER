@@ -5,8 +5,7 @@ export interface AuthResult {
 }
 
 const errorKeys: Record<string, string> = {
-  EMAIL_NOT_REGISTERED: 'auth.error.emailNotRegistered',
-  WRONG_PASSWORD: 'auth.error.wrongPassword',
+  INVALID_CREDENTIALS: 'auth.error.invalidCredentials',
   EMAIL_ALREADY_REGISTERED: 'auth.error.emailAlreadyRegistered',
   INVALID_INPUT: 'auth.error.invalidInput',
   RATE_LIMITED: 'auth.error.rateLimited',
@@ -23,6 +22,7 @@ export function authFailure(data: { error?: string; code?: string }, status: num
   // with existing responses that do not yet include a structured code.
   const code = status === 429 ? 'RATE_LIMITED'
     : status === 409 ? 'EMAIL_ALREADY_REGISTERED'
+    : status === 401 ? 'INVALID_CREDENTIALS'
     : data.code ?? (status === 400 ? 'INVALID_INPUT' : 'SERVER_ERROR');
   return { success: false, error: data.error, code };
 }

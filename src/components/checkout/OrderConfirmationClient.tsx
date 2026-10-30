@@ -2,11 +2,18 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { CircleCheck as CheckCircle, Package, Truck, Calendar, ArrowRight } from 'lucide-react';
+import { CircleCheck as CheckCircle, Package, Truck, Calendar, ArrowRight, MessageCircle } from 'lucide-react';
 import { formatPrice } from '@/lib/pricing';
 import { SafeImage } from '@/components/ui/SafeImage';
 import { Logo } from '@/components/layout/Logo';
 import { trackPurchase } from '@/lib/fbpixel';
+import { useI18n } from '@/context/I18nContext';
+import {
+  buildWhatsAppOrderMessage,
+  buildWhatsAppUrl,
+  isPaymentMethod,
+  type PaymentMethod,
+} from '@/lib/payment-methods';
 import type { OrderSummary } from '@/types';
 
 interface ServerOrderData {
@@ -19,6 +26,14 @@ interface ServerOrderData {
   shipping: number;
   total: number;
   placedAt: string;
+  status: string;
+  paymentMethod: string;
+  customerName: string;
+  deliveryNotes: string;
+  preferredDeliveryTime: string;
+  whatsappNumber: string;
+  instapayHandle: string;
+  vodafoneCashNumber: string;
   shippingDetails: {
     fullName: string;
     email: string;
@@ -39,6 +54,7 @@ interface ConfirmationPageProps {
 }
 
 export function OrderConfirmationClient({ orderNumber, serverOrder }: ConfirmationPageProps) {
+  const { t } = useI18n();
   const [order, setOrder] = useState<OrderSummary | null>(serverOrder ? convertServerOrder(serverOrder) : null);
   const [loaded, setLoaded] = useState(!!serverOrder);
 
@@ -85,6 +101,33 @@ export function OrderConfirmationClient({ orderNumber, serverOrder }: Confirmati
     );
   }
 
+  const rawMethod = serverOrder?.paymentMethod ?? '';
+  const paymentMethod: PaymentMethod | '' = isPaymentMethod(rawMethod) ? rawMethod : '';
+  const status = serverOrder?.status ?? '';
+  // Manual payments stay pending until the admin confirms the screenshot.
+  const showPaymentInstructions =
+    paymentMethod !== '' && status !== 'COMPLETED' && status !== 'CANCELLED';
+  const methodTitle =
+    paymentMethod === 'instapay' ? t('order.pay.instapay')
+    : paymentMethod === 'vodafone_cash' ? t('order.pay.vodafone_cash')
+    : paymentMethod === 'cod' ? t('order.pay.cod')
+    : '';
+  const methodValue =
+    paymentMethod === 'instapay' ? serverOrder?.instapayHandle ?? ''
+    : paymentMethod === 'vodafone_cash' ? serverOrder?.vodafoneCashNumber ?? ''
+    : '';
+  const deliveryNotes = serverOrder?.deliveryNotes ?? '';
+  const preferredDeliveryTime = serverOrder?.preferredDeliveryTime ?? '';
+  const whatsappUrl = buildWhatsAppUrl(
+    serverOrder?.whatsappNumber,
+    buildWhatsAppOrderMessage({
+      orderNumber: order.orderNumber,
+      customerName: serverOrder?.customerName || order.shippingDetails.fullName,
+      totalLabel: formatPrice(order.total),
+      paymentMethod,
+    })
+  );
+
   const estimatedDays = parseInt(order.deliveryMethod.estimatedDays.split('-')[0]) || 5;
   const estimatedDelivery = new Date();
   estimatedDelivery.setDate(estimatedDelivery.getDate() + estimatedDays);
@@ -112,6 +155,57 @@ export function OrderConfirmationClient({ orderNumber, serverOrder }: Confirmati
           </p>
           <p className="text-lg font-bold text-gold mt-3">{order.orderNumber}</p>
         </div>
+
+        {/* Manual payment instructions */}
+        {showPaymentInstructions && (
+          <div className="mb-6 rounded-xl border border-gold/40 bg-gold/5 p-5 sm:p-6 space-y-4">
+            <div className="flex items-center gap-2">
+              <span className="h-2 w-2 shrink-0 rounded-full bg-gold animate-pulse" />
+              <p dir="auto" className="text-sm font-semibold text-gold">
+                {t('order.status.awaitingPayment')}
+              </p>
+            </div>
+
+            <div>
+              <h2 dir="auto" className="font-heading text-base font-bold text-text mb-2">
+                {t('order.paymentInstructions')}
+              </h2>
+              <div className="rounded-lg border border-border bg-surface-elevated p-4 text-center">
+                {paymentMethod === 'cod' ? (
+                  <p dir="auto" className="text-xl sm:text-2xl font-bold text-text">
+                    {methodTitle}
+                  </p>
+                ) : (
+                  <>
+                    <p dir="auto" className="text-xs text-muted mb-1">{methodTitle}</p>
+                    {methodValue ? (
+                      <p dir="auto" className="text-2xl sm:text-3xl font-bold text-text break-all">
+                        {methodValue}
+                      </p>
+                    ) : (
+                      <p dir="auto" className="text-sm text-muted">{t('order.sendScreenshot')}</p>
+                    )}
+                  </>
+                )}
+              </div>
+            </div>
+
+            <div className="text-center space-y-3">
+              <p dir="auto" className="text-sm text-muted">{t('order.sendScreenshot')}</p>
+              {whatsappUrl ? (
+                <a
+                  href={whatsappUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center justify-center gap-2 rounded-lg bg-success px-6 py-3 text-sm font-semibold text-background transition-opacity hover:opacity-90"
+                >
+                  <MessageCircle className="h-4 w-4" />
+                  <span dir="auto">{t('order.whatsapp')}</span>
+                </a>
+              ) : null}
+            </div>
+          </div>
+        )}
 
         {/* Order details */}
         <div className="bg-surface rounded-xl border border-border p-5 sm:p-6 space-y-6">
@@ -141,6 +235,24 @@ export function OrderConfirmationClient({ orderNumber, serverOrder }: Confirmati
                 <p>{order.shippingDetails.city}, {order.shippingDetails.stateOrRegion} {order.shippingDetails.postalCode}</p>
                 <p>{order.shippingDetails.country}</p>
               </div>
+            </div>
+          )}
+
+          {/* Delivery notes / preferred time */}
+          {(deliveryNotes || preferredDeliveryTime) && (
+            <div className="text-sm p-3 rounded-lg bg-surface-elevated space-y-1">
+              {preferredDeliveryTime ? (
+                <p>
+                  <span dir="auto" className="text-muted">{t('order.preferredDeliveryTime')}: </span>
+                  <span dir="auto" className="text-text">{preferredDeliveryTime}</span>
+                </p>
+              ) : null}
+              {deliveryNotes ? (
+                <p>
+                  <span dir="auto" className="text-muted">{t('order.deliveryNotes')}: </span>
+                  <span dir="auto" className="text-text">{deliveryNotes}</span>
+                </p>
+              ) : null}
             </div>
           )}
 

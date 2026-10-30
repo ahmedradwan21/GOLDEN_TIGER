@@ -1,3 +1,4 @@
+import { serverError } from '@/lib/api/errors';
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/db-admin';
 import { generateCouponCode } from '@/lib/data/loyalty';
@@ -89,7 +90,6 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({ coupon, pointsCost });
   } catch (err) {
-    const message = err instanceof Error ? err.message : 'Failed to redeem points';
-    return NextResponse.json({ error: message }, { status: 500 });
+    return serverError(err, 500, "loyalty");
   }
 }

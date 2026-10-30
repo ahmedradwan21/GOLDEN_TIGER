@@ -1,12 +1,12 @@
+import { serverError } from '@/lib/api/errors';
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/db-admin';
-import { getAdminSession } from '@/lib/auth/session';
+import { requireAdmin } from '@/lib/auth/require-admin';
 
 export async function GET(req: NextRequest) {
-  const session = await getAdminSession();
-  if (!session) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
+  const auth = await requireAdmin();
+  if (!auth.ok) return auth.response;
+  const session = auth.admin;
 
   const { searchParams } = new URL(req.url);
   const page = parseInt(searchParams.get('page') ?? '1', 10);
@@ -21,7 +21,7 @@ export async function GET(req: NextRequest) {
       .range(offset, offset + limit - 1);
 
     if (error) {
-      return NextResponse.json({ error: error.message }, { status: 500 });
+      return serverError(error, 500);
     }
 
     const productIds = Array.from(new Set((data ?? []).map((r) => r.product_id)));
@@ -50,8 +50,10 @@ export async function GET(req: NextRequest) {
 }
 
 export async function PATCH(req: NextRequest) {
-  const session = await getAdminSession();
-  if (!session || session.role !== 'SUPER_ADMIN') {
+  const auth = await requireAdmin();
+  if (!auth.ok) return auth.response;
+  const session = auth.admin;
+  if (session.role !== 'SUPER_ADMIN') {
     return NextResponse.json({ error: 'Forbidden: SUPER_ADMIN only' }, { status: 403 });
   }
 
@@ -87,7 +89,7 @@ export async function PATCH(req: NextRequest) {
       .single();
 
     if (error) {
-      return NextResponse.json({ error: error.message }, { status: 500 });
+      return serverError(error, 500);
     }
 
     return NextResponse.json({ review: data });

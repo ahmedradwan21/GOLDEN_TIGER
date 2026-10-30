@@ -4,30 +4,7 @@ export const TAX_RATE = 0.08;
 export const FREE_SHIPPING_THRESHOLD = 5000; // $50.00 in cents
 export const STANDARD_SHIPPING_FEE = 599; // $5.99 in cents
 
-export const DELIVERY_METHODS: DeliveryMethod[] = [
-  {
-    id: 'standard',
-    name: 'Standard Shipping',
-    description: '5-7 business days',
-    fee: STANDARD_SHIPPING_FEE,
-    freeThreshold: FREE_SHIPPING_THRESHOLD,
-    estimatedDays: '5-7 days',
-  },
-  {
-    id: 'express',
-    name: 'Express Shipping',
-    description: '2-3 business days',
-    fee: 1499,
-    estimatedDays: '2-3 days',
-  },
-  {
-    id: 'next-day',
-    name: 'Next-Day Delivery',
-    description: '1 business day',
-    fee: 2499,
-    estimatedDays: '1 day',
-  },
-];
+// Delivery methods come from the shipping_methods table via /api/shipping-methods.
 
 export interface PriceBreakdown {
   itemCount: number;

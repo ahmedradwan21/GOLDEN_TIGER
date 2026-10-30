@@ -1,23 +1,24 @@
+import { serverError } from '@/lib/api/errors';
 import { NextRequest, NextResponse } from 'next/server';
-import { getAdminSession } from '@/lib/auth/session';
+import { requireAdmin } from '@/lib/auth/require-admin';
 import { supabaseAdmin } from '@/lib/db-admin';
 import { toAnnouncementSettings, validateAnnouncementInput } from '@/lib/announcement';
 
 export const dynamic = 'force-dynamic';
 
 export async function GET() {
-  if (!(await getAdminSession())) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  const auth = await requireAdmin(); if (!auth.ok) return auth.response;
   const { data, error } = await supabaseAdmin
     .from('announcement_bar_settings')
     .select('*')
     .limit(1)
     .maybeSingle();
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) return serverError(error, 500);
   return NextResponse.json(toAnnouncementSettings(data as Record<string, unknown> | null));
 }
 
 export async function PUT(req: NextRequest) {
-  if (!(await getAdminSession())) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  const auth = await requireAdmin(); if (!auth.ok) return auth.response;
 
   let input;
   try {
@@ -29,7 +30,7 @@ export async function PUT(req: NextRequest) {
 
   // Single-row table: update the existing row, or create it if it is missing.
   const existing = await supabaseAdmin.from('announcement_bar_settings').select('id').limit(1).maybeSingle();
-  if (existing.error) return NextResponse.json({ error: existing.error.message }, { status: 500 });
+  if (existing.error) return serverError(existing.error, 500);
 
   const result = existing.data
     ? await supabaseAdmin
@@ -40,6 +41,6 @@ export async function PUT(req: NextRequest) {
         .single()
     : await supabaseAdmin.from('announcement_bar_settings').insert(input).select('*').single();
 
-  if (result.error) return NextResponse.json({ error: result.error.message }, { status: 400 });
+  if (result.error) return serverError(result.error, 400);
   return NextResponse.json(toAnnouncementSettings(result.data as Record<string, unknown>));
 }

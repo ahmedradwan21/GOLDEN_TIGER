@@ -1,12 +1,12 @@
+import { serverError } from '@/lib/api/errors';
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/db-admin';
-import { getAdminSession } from '@/lib/auth/session';
+import { requireAdmin } from '@/lib/auth/require-admin';
 
 export async function GET(req: NextRequest) {
-  const session = await getAdminSession();
-  if (!session) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
+  const auth = await requireAdmin();
+  if (!auth.ok) return auth.response;
+  const session = auth.admin;
 
   const { searchParams } = new URL(req.url);
   const jobId = searchParams.get('jobId');
@@ -23,7 +23,7 @@ export async function GET(req: NextRequest) {
   const { data, error } = await query;
 
   if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return serverError(error, 500);
   }
 
   return NextResponse.json({ applications: data ?? [] });

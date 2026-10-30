@@ -1,3 +1,4 @@
+import { serverError } from '@/lib/api/errors';
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { supabaseAdmin } from '@/lib/db-admin';
@@ -17,7 +18,7 @@ export async function POST(req: NextRequest) {
       .eq('session_id', parsed.data.sessionId);
     if (error) {
       console.error('[browsing-history] delete failed:', error.code, error.message);
-      return NextResponse.json({ error: `Database error during browsing_history delete: ${error.message}`, code: error.code ?? null }, { status: 500 });
+      return serverError(error, 500, "browsing-history");
     }
     return NextResponse.json({ deleted: count ?? 0 });
   } catch (err) {

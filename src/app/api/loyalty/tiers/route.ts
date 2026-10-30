@@ -1,3 +1,4 @@
+import { serverError } from '@/lib/api/errors';
 import { NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/db-admin';
 import { LOYALTY_TIER_FIELDS } from '@/lib/loyalty-tiers';
@@ -11,6 +12,6 @@ export async function GET() {
     .select(LOYALTY_TIER_FIELDS)
     .eq('is_active', true)
     .order('sort_order', { ascending: true });
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) return serverError(error, 500);
   return NextResponse.json({ tiers: data ?? [] });
 }

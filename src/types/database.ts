@@ -232,6 +232,7 @@ export interface Database {
           tax_cents: number;
           shipping_cents: number;
           total_cents: number;
+          discount_cents: number;
           currency: string;
           payment_method: string | null;
           payment_ref: string | null;
@@ -255,6 +256,7 @@ export interface Database {
           tax_cents?: number;
           shipping_cents?: number;
           total_cents: number;
+          discount_cents?: number;
           currency?: string;
           payment_method?: string | null;
           payment_ref?: string | null;
@@ -276,6 +278,7 @@ export interface Database {
           tax_cents?: number;
           shipping_cents?: number;
           total_cents?: number;
+          discount_cents?: number;
           currency?: string;
           payment_method?: string | null;
           payment_ref?: string | null;

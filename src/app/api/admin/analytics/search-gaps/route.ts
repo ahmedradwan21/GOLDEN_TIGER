@@ -1,12 +1,11 @@
 import { NextResponse } from 'next/server';
-import { getAdminSession } from '@/lib/auth/session';
+import { requireAdmin } from '@/lib/auth/require-admin';
 import { supabaseAdmin } from '@/lib/db-admin';
 
 export async function GET() {
-  const session = await getAdminSession();
-  if (!session) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
+  const auth = await requireAdmin();
+  if (!auth.ok) return auth.response;
+  const session = auth.admin;
 
   try {
     const { data, error } = await supabaseAdmin

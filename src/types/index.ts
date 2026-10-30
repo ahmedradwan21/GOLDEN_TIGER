@@ -62,6 +62,10 @@ export interface ShippingDetails {
   stateOrRegion: string;
   postalCode: string;
   country: string;
+  deliveryNotes?: string;
+  secondaryPhone?: string;
+  landmark?: string;
+  preferredDeliveryTime?: string;
 }
 
 export interface DeliveryMethod {
@@ -96,20 +100,6 @@ export interface HeroSlide {
   ctaHref: string;
   sponsored?: boolean;
   productId?: string;
-}
-
-export interface PaymentInput {
-  nameOnCard: string;
-  cardNumber: string;
-  expiry: string;
-  cvc: string;
-  amount: number; // cents
-}
-
-export interface PaymentResult {
-  success: boolean;
-  message: string;
-  declineCode?: string;
 }
 
 export interface SearchParams {

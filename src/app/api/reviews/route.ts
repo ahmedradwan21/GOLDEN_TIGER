@@ -1,5 +1,7 @@
+import { serverError } from '@/lib/api/errors';
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/db';
+import { getClientIp, rateLimitHit, rateLimitedResponse } from '@/lib/rate-limit';
 
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
@@ -18,7 +20,7 @@ export async function GET(req: NextRequest) {
       .order('created_at', { ascending: false });
 
     if (error) {
-      return NextResponse.json({ error: error.message }, { status: 500 });
+      return serverError(error, 500);
     }
 
     return NextResponse.json({ reviews: data ?? [] });
@@ -29,6 +31,8 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   try {
+    if (!(await rateLimitHit(`review:ip:${getClientIp(req)}`, 5, 60 * 60))) return rateLimitedResponse();
+
     const body = await req.json();
     const { productId, authorName, rating, comment } = body;
 
@@ -61,7 +65,7 @@ export async function POST(req: NextRequest) {
       .single();
 
     if (error) {
-      return NextResponse.json({ error: error.message }, { status: 500 });
+      return serverError(error, 500);
     }
 
     return NextResponse.json({ review: data });

@@ -15,10 +15,20 @@ const startSchema = z.object({
 
 function dbFail(step: string, error: { message: string; code?: string } | null) {
   console.error(`[checkout] ${step} failed:`, error?.code, error?.message);
-  return NextResponse.json(
-    { error: `Database error during ${step}: ${error?.message ?? 'unknown error'} (possible RLS rejection)`, code: error?.code ?? null },
-    { status: 500 }
-  );
+  return NextResponse.json({ error: 'Checkout could not be processed. Please try again.' }, { status: 500 });
+}
+
+// Newest open order for this session. Never uses maybeSingle(): duplicates must not crash.
+async function findOpenOrder(sessionId: string, cutoff?: string) {
+  let q = supabaseAdmin
+    .from('orders')
+    .select('id, session_id, status, checkout_started_at')
+    .eq('session_id', sessionId)
+    .eq('status', 'CHECKOUT_STARTED')
+    .is('order_number', null);
+  if (cutoff) q = q.gte('checkout_started_at', cutoff);
+  const { data, error } = await q.order('checkout_started_at', { ascending: false }).limit(1);
+  return { data: (data?.[0] ?? null) as { id: string } | null, error };
 }
 
 export async function POST(req: NextRequest) {
@@ -33,38 +43,45 @@ export async function POST(req: NextRequest) {
     const session = await getSession();
 
     const cutoff = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
-    const { data: existing, error: existingError } = await supabaseAdmin
-      .from('orders')
-      .select('id, session_id, status, checkout_started_at')
-      .eq('session_id', sessionId)
-      .eq('status', 'CHECKOUT_STARTED')
-      .gte('checkout_started_at', cutoff)
-      .maybeSingle();
+    const { data: existing, error: existingError } = await findOpenOrder(sessionId, cutoff);
     if (existingError) return dbFail('orders select', existingError);
 
-    const productIds = items.map((i) => i.productId);
+    const productIds = Array.from(new Set(items.map((i) => i.productId)));
     const { data: products, error: productsError } = await supabaseAdmin
       .from('products')
-      .select('id, title, images, price_cents')
+      .select('id, title, images, price_cents, is_published')
       .in('id', productIds);
     if (productsError) return dbFail('products select', productsError);
 
-    const productMap = new Map((products ?? []).map((p: { id: string; title: string; images: string[]; price_cents: number }) => [p.id, p]));
+    type ProductRow = { id: string; title: string; images: string[] | null; price_cents: number | null; is_published: boolean };
+    const productMap = new Map((products ?? []).map((p: ProductRow) => [p.id, p]));
+
+    // Never create an order line from a missing/unpublished/unpriced product.
+    const isSellable = (p: ProductRow | undefined): p is ProductRow =>
+      !!p && p.is_published === true && Number.isInteger(p.price_cents) && (p.price_cents as number) > 0;
+    const invalidItems = items
+      .filter((i) => !isSellable(productMap.get(i.productId)))
+      .map((i) => ({ productId: i.productId, quantity: i.quantity, reason: 'unavailable' as const }));
+    if (invalidItems.length > 0) {
+      return NextResponse.json({ error: 'Some items are no longer available', items: invalidItems }, { status: 400 });
+    }
+
     const orderItems = items.map((i) => {
-      const p = productMap.get(i.productId);
+      const p = productMap.get(i.productId) as ProductRow;
       return {
-        product_id: i.productId,
-        title_snapshot: p?.title ?? 'Unknown Product',
-        image_snapshot: p?.images?.[0] ?? null,
-        unit_price_cents: p?.price_cents ?? 0,
+        product_id: p.id,
+        title_snapshot: p.title,
+        image_snapshot: p.images?.[0] ?? null,
+        unit_price_cents: p.price_cents as number,
         quantity: i.quantity,
       };
     });
 
     const subtotal = orderItems.reduce((sum, i) => sum + i.unit_price_cents * i.quantity, 0);
 
-    if (existing) {
-      const { error: delError } = await supabaseAdmin.from('order_items').delete().eq('order_id', existing.id);
+    // Replace items/totals on an existing open order (shared by the reuse and 23505 paths).
+    const reuseOrder = async (orderId: string) => {
+      const { error: delError } = await supabaseAdmin.from('order_items').delete().eq('order_id', orderId);
       if (delError) return dbFail('order_items delete', delError);
       const { error: updError } = await supabaseAdmin
         .from('orders')
@@ -73,15 +90,17 @@ export async function POST(req: NextRequest) {
           subtotal_cents: subtotal,
           total_cents: subtotal,
         })
-        .eq('id', existing.id);
+        .eq('id', orderId);
       if (updError) return dbFail('orders update', updError);
 
-      const itemsWithOrderId = orderItems.map((i) => ({ ...i, order_id: existing.id }));
+      const itemsWithOrderId = orderItems.map((i) => ({ ...i, order_id: orderId }));
       const { error: insError } = await supabaseAdmin.from('order_items').insert(itemsWithOrderId);
       if (insError) return dbFail('order_items insert', insError);
 
-      return NextResponse.json({ orderId: existing.id });
-    }
+      return NextResponse.json({ orderId });
+    };
+
+    if (existing) return reuseOrder(existing.id);
 
     const { data: order, error } = await supabaseAdmin
       .from('orders')
@@ -96,6 +115,12 @@ export async function POST(req: NextRequest) {
       .select('id')
       .single();
 
+    if (error?.code === '23505') {
+      // A concurrent /start created the open order first (partial unique index); reuse it.
+      const { data: winner, error: winnerError } = await findOpenOrder(sessionId);
+      if (winnerError || !winner) return dbFail('orders reselect', winnerError ?? error);
+      return reuseOrder(winner.id);
+    }
     if (error || !order) return dbFail('orders insert', error);
 
     const itemsWithOrderId = orderItems.map((i) => ({ ...i, order_id: order.id }));
@@ -105,6 +130,6 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ orderId: order.id });
   } catch (err) {
     console.error('[checkout] Unexpected error:', err);
-    return NextResponse.json({ error: `Unexpected checkout error: ${err instanceof Error ? err.message : String(err)}` }, { status: 500 });
+    return NextResponse.json({ error: 'Checkout could not be processed. Please try again.' }, { status: 500 });
   }
 }

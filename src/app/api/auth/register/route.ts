@@ -3,15 +3,19 @@ import { z } from 'zod';
 import { supabaseAdmin } from '@/lib/db-admin';
 import { hashPassword } from '@/lib/auth/password';
 import { createSessionCookie } from '@/lib/auth/session';
+import { normalizeEmail } from '@/lib/auth/email';
+import { getClientIp, rateLimitHit, rateLimitedResponse } from '@/lib/rate-limit';
 
 const registerSchema = z.object({
-  email: z.string().email(),
+  email: z.string().trim().email(),
   password: z.string().min(8, 'Password must be at least 8 characters'),
   name: z.string().min(1).optional(),
 });
 
 export async function POST(req: NextRequest) {
   try {
+    if (!(await rateLimitHit(`register:ip:${getClientIp(req)}`, 5, 60 * 60))) return rateLimitedResponse();
+
     const body = await req.json();
     const parsed = registerSchema.safeParse(body);
     if (!parsed.success) {
@@ -21,7 +25,8 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const { email, password, name } = parsed.data;
+    const { password, name } = parsed.data;
+    const email = normalizeEmail(parsed.data.email);
     const { data: existing, error: lookupError } = await supabaseAdmin
       .from('users')
       .select('id')

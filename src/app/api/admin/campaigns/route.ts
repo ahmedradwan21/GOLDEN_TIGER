@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getAdminSession } from '@/lib/auth/session';
+import { requireAdmin } from '@/lib/auth/require-admin';
 import { getAllCampaigns, updateCampaign } from '@/lib/data/campaigns';
 
 export async function GET() {
+  const auth = await requireAdmin(); if (!auth.ok) return auth.response;
   try {
     const campaigns = await getAllCampaigns();
     return NextResponse.json({ campaigns });
@@ -12,10 +13,9 @@ export async function GET() {
 }
 
 export async function PATCH(req: NextRequest) {
-  const session = await getAdminSession();
-  if (!session) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
+  const auth = await requireAdmin();
+  if (!auth.ok) return auth.response;
+  const session = auth.admin;
 
   try {
     const body = await req.json();

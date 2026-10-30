@@ -1,5 +1,6 @@
+import { serverError } from '@/lib/api/errors';
 import { NextRequest, NextResponse } from 'next/server';
-import { getAdminSession } from '@/lib/auth/session';
+import { requireAdmin } from '@/lib/auth/require-admin';
 import { supabaseAdmin } from '@/lib/db-admin';
 import { getTopCustomers, generateCouponCode } from '@/lib/data/loyalty';
 import { formatPrice } from '@/lib/pricing';
@@ -50,10 +51,9 @@ async function insertCouponAdmin(params: {
 }
 
 export async function GET() {
-  const session = await getAdminSession();
-  if (!session) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
+  const auth = await requireAdmin();
+  if (!auth.ok) return auth.response;
+  const session = auth.admin;
 
   try {
     const customers = await getTopCustomers(20);
@@ -64,10 +64,9 @@ export async function GET() {
 }
 
 export async function POST(req: NextRequest) {
-  const session = await getAdminSession();
-  if (!session) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
+  const auth = await requireAdmin();
+  if (!auth.ok) return auth.response;
+  const session = auth.admin;
 
   try {
     const body = await req.json();
@@ -99,7 +98,6 @@ export async function POST(req: NextRequest) {
       message: `Coupon ${coupon.code} created for ${customerEmail || customerPhone} — ${discountType === 'percentage' ? value + '% off' : formatPrice(value)} valid for 30 days`,
     });
   } catch (err) {
-    const message = err instanceof Error ? err.message : 'Failed to create coupon';
-    return NextResponse.json({ error: message }, { status: 500 });
+    return serverError(err, 500, "loyalty");
   }
 }

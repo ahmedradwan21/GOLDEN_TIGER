@@ -3,19 +3,22 @@ import { z } from 'zod';
 import { supabaseAdmin } from '@/lib/db-admin';
 import { getSession } from '@/lib/auth/session';
 import { TAX_RATE } from '@/lib/pricing';
+import { getShippingPriceCents } from '@/lib/data/shipping-methods';
 import { generateOrderNumber } from '@/lib/payments/mockGateway';
+import { sendOrderTelegram } from '@/lib/telegram-order';
+import { paymentMethodSchema } from '@/lib/payment-methods';
+import { computeCouponDiscount } from '@/lib/coupon-discount';
+import { findUsableCoupon, redeemCoupon, releaseCoupon } from '@/lib/data/coupons';
 
 const completeSchema = z.object({
   sessionId: z.string().min(1),
-  paymentRef: z.string().min(1),
+  paymentMethod: paymentMethodSchema,
+  couponCode: z.string().trim().max(64).optional().nullable(),
 });
 
 function dbFail(step: string, error: { message: string; code?: string } | null) {
   console.error(`[checkout] ${step} failed:`, error?.code, error?.message);
-  return NextResponse.json(
-    { error: `Database error during ${step}: ${error?.message ?? 'unknown error'} (possible RLS rejection)`, code: error?.code ?? null },
-    { status: 500 }
-  );
+  return NextResponse.json({ error: 'Checkout could not be processed. Please try again.' }, { status: 500 });
 }
 
 export async function POST(
@@ -39,6 +42,14 @@ export async function POST(
     if (orderError) return dbFail('orders select', orderError);
     if (!order) {
       return NextResponse.json({ error: 'Order not found' }, { status: 404 });
+    }
+    if (order.session_id !== parsed.data.sessionId) {
+      return NextResponse.json({ error: 'Order not found' }, { status: 404 });
+    }
+    // An order is "submitted" once it has an order_number. It stays CHECKOUT_STARTED
+    // (pending confirmation) — it is never marked paid/COMPLETED on submission.
+    if (order.status !== 'CHECKOUT_STARTED' || order.order_number) {
+      return NextResponse.json({ error: 'Order was already submitted' }, { status: 409 });
     }
 
     const { data: items, error: itemsError } = await supabaseAdmin
@@ -85,15 +96,65 @@ export async function POST(
     }
 
     const tax = Math.round(subtotal * TAX_RATE);
-    let shipping = order.shipping_cents;
-    if (order.delivery_method === 'standard') {
-      shipping = subtotal >= 5000 ? 0 : 599;
-    } else if (order.delivery_method === 'express') {
-      shipping = 1499;
-    } else if (order.delivery_method === 'next-day') {
-      shipping = 2499;
+    const shipping = (await getShippingPriceCents(order.delivery_method)) ?? order.shipping_cents ?? 0;
+
+    // Coupon is re-checked here with the server-trusted subtotal; the client value is never used.
+    let discount = 0;
+    let coupon: { id: string; code: string; uses_count: number; max_uses: number | null } | null = null;
+    if (parsed.data.couponCode) {
+      const found = await findUsableCoupon(parsed.data.couponCode, session?.email);
+      if (!found.ok) return NextResponse.json({ error: 'coupon', couponError: found.error }, { status: 422 });
+      coupon = found.coupon;
+      discount = computeCouponDiscount(found.coupon, subtotal);
     }
-    const total = subtotal + tax + shipping;
+    const total = Math.max(0, subtotal + tax + shipping - discount);
+
+    // Claim the order atomically so double-clicks / concurrent requests cannot
+    // submit it (or decrement stock) twice. On an order_number unique collision
+    // (Postgres 23505) retry with a fresh number, up to 3 retries.
+    const MAX_CLAIM_RETRIES = 3;
+    let orderNumber = '';
+    let claimed: { id: string }[] | null = null;
+    for (let attempt = 0; attempt <= MAX_CLAIM_RETRIES; attempt++) {
+      orderNumber = generateOrderNumber();
+      const { data, error: claimError } = await supabaseAdmin
+        .from('orders')
+        .update({ order_number: orderNumber })
+        .eq('id', params.orderId)
+        .eq('status', 'CHECKOUT_STARTED')
+        .is('order_number', null)
+        .select('id');
+      if (claimError?.code === '23505' && attempt < MAX_CLAIM_RETRIES) {
+        console.warn(`[checkout] order_number collision, retrying (${attempt + 1}/${MAX_CLAIM_RETRIES})`);
+        continue;
+      }
+      if (claimError) return dbFail('orders claim', claimError);
+      claimed = data;
+      break;
+    }
+    if (!claimed || claimed.length === 0) {
+      return NextResponse.json({ error: 'Order was already submitted' }, { status: 409 });
+    }
+    const releaseClaim = async () => {
+      const { error: relError } = await supabaseAdmin
+        .from('orders')
+        .update({ order_number: null })
+        .eq('id', params.orderId)
+        .eq('order_number', orderNumber);
+      if (relError) console.error('[checkout] release claim failed:', relError.message);
+    };
+
+    // Atomic increment guarded by max_uses. 0 rows affected = limit reached: abort, order not completed.
+    if (coupon && !(await redeemCoupon(coupon.code))) {
+      await releaseClaim();
+      return NextResponse.json(
+        { error: 'This coupon has reached its usage limit. The order was not placed.', couponError: 'used_up' },
+        { status: 422 }
+      );
+    }
+    const restoreCoupon = async () => {
+      if (coupon) await releaseCoupon(coupon.code);
+    };
 
     // Atomic stock decrement via the decrement_stock DB function (returns true/false).
     // If any item fails, restore the items already decremented and abort WITHOUT completing the order.
@@ -108,6 +169,8 @@ export async function POST(
           .eq('id', d.productId);
         if (rbError) console.error(`[checkout] rollback failed for ${d.productId}:`, rbError.message);
       }
+      await restoreCoupon();
+      await releaseClaim();
     };
 
     for (const item of items as { product_id: string | null; title_snapshot: string; quantity: number }[]) {
@@ -130,29 +193,47 @@ export async function POST(
       decremented.push({ productId: item.product_id, quantity: item.quantity });
     }
 
-    const orderNumber = generateOrderNumber();
     const { data: doneRows, error: completeError } = await supabaseAdmin
       .from('orders')
       .update({
-        status: 'COMPLETED',
-        completed_at: new Date().toISOString(),
-        order_number: orderNumber,
-        payment_ref: parsed.data.paymentRef,
-        payment_method: 'mock_card',
+        // Status intentionally stays CHECKOUT_STARTED: the order is submitted and
+        // awaiting confirmation; nothing has been paid.
         user_id: session?.userId ?? order.user_id,
         subtotal_cents: subtotal,
         tax_cents: tax,
         shipping_cents: shipping,
         total_cents: total,
+        discount_cents: discount,
+        coupon_code: coupon?.code ?? null,
+        payment_method: parsed.data.paymentMethod,
       })
       .eq('id', params.orderId)
+      .eq('status', 'CHECKOUT_STARTED')
+      .eq('order_number', orderNumber)
       .select('id');
     if (completeError) { await rollback(); return dbFail('orders complete update', completeError); }
     if (!doneRows || doneRows.length === 0) { await rollback(); return dbFail('orders complete update', { message: 'no rows updated' }); }
 
-    return NextResponse.json({ orderId: params.orderId, orderNumber, totalCents: total });
+    // Notify via Telegram once. The atomic order_number claim above guarantees only one
+    // request reaches this point per order, so retries cannot send duplicates. A failed
+    // send is logged and never affects the saved order.
+    await sendOrderTelegram(
+      { ...order, payment_method: parsed.data.paymentMethod, order_number: orderNumber, shipping_cents: shipping, total_cents: total },
+      items as { title_snapshot: string; quantity: number; unit_price_cents: number }[]
+    );
+
+    const res = NextResponse.json({ orderId: params.orderId, orderNumber, totalCents: total, discountCents: discount });
+    // Short-lived proof of ownership for the confirmation page (httpOnly; never readable by JS).
+    res.cookies.set(`gt_oc_${orderNumber}`, order.session_id, {
+      httpOnly: true,
+      sameSite: 'lax',
+      secure: process.env.NODE_ENV === 'production',
+      maxAge: 24 * 60 * 60,
+      path: '/order-confirmation',
+    });
+    return res;
   } catch (err) {
     console.error('[checkout] Unexpected error:', err);
-    return NextResponse.json({ error: `Unexpected checkout error: ${err instanceof Error ? err.message : String(err)}` }, { status: 500 });
+    return NextResponse.json({ error: 'Checkout could not be processed. Please try again.' }, { status: 500 });
   }
 }

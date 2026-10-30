@@ -1,6 +1,7 @@
+import { serverError } from '@/lib/api/errors';
 import { NextRequest, NextResponse } from 'next/server';
 import { revalidateHomepage } from '@/lib/revalidate-home';
-import { getAdminSession } from '@/lib/auth/session';
+import { requireAdmin } from '@/lib/auth/require-admin';
 import { supabaseAdmin } from '@/lib/db-admin';
 import { normalizeProductImages } from '@/lib/product-images';
 import { clampPriority, sortByPriority } from '@/lib/homepage-banners';
@@ -12,13 +13,13 @@ const BANNER_COLUMNS =
 
 /** All products flagged as homepage banners, highest priority first. */
 export async function GET() {
-  if (!(await getAdminSession())) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  const auth = await requireAdmin(); if (!auth.ok) return auth.response;
   const { data, error } = await supabaseAdmin
     .from('products')
     .select(BANNER_COLUMNS)
     .eq('is_homepage_banner', true)
     .order('ad_priority', { ascending: false });
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) return serverError(error, 500);
   const rows = sortByPriority((data ?? []) as { ad_priority: number | null; images: unknown }[]);
   return NextResponse.json(rows.map((r) => ({ ...r, images: normalizeProductImages(r.images) })));
 }
@@ -28,7 +29,7 @@ export async function GET() {
  * Body: { priorities?: { id, ad_priority }[], remove?: string }
  */
 export async function PATCH(req: NextRequest) {
-  if (!(await getAdminSession())) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  const auth = await requireAdmin(); if (!auth.ok) return auth.response;
 
   let body: { priorities?: unknown; remove?: unknown };
   try {
@@ -42,7 +43,7 @@ export async function PATCH(req: NextRequest) {
       .from('products')
       .update({ is_homepage_banner: false, updated_at: new Date().toISOString() })
       .eq('id', body.remove);
-    if (error) return NextResponse.json({ error: error.message }, { status: 400 });
+    if (error) return serverError(error, 400);
     revalidateHomepage();
     return NextResponse.json({ success: true });
   }
@@ -69,7 +70,7 @@ export async function PATCH(req: NextRequest) {
     )
   );
   const failed = results.find((r) => r.error);
-  if (failed?.error) return NextResponse.json({ error: failed.error.message }, { status: 400 });
+  if (failed?.error) return serverError(failed.error, 400);
 
   revalidateHomepage();
   return NextResponse.json({ success: true });

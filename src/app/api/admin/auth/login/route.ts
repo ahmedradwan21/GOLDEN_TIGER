@@ -3,41 +3,33 @@ import { z } from 'zod';
 import { supabaseAdmin } from '@/lib/db-admin';
 import { verifyPassword } from '@/lib/auth/password';
 import { createAdminCookie } from '@/lib/auth/session';
+import { normalizeEmail } from '@/lib/auth/email';
+import { getClientIp, rateLimitHit, rateLimitedResponse } from '@/lib/rate-limit';
 
 const adminLoginSchema = z.object({
   email: z.string().email(),
   password: z.string().min(1),
 });
 
-const ipHits = new Map<string, { count: number; resetAt: number }>();
-const emailHits = new Map<string, { count: number; resetAt: number }>();
 const RATE_LIMIT = 5;
-const RATE_WINDOW = 15 * 60 * 1000;
-
-function checkRate(key: string, map: Map<string, { count: number; resetAt: number }>): boolean {
-  const now = Date.now();
-  const entry = map.get(key);
-  if (!entry || entry.resetAt < now) {
-    map.set(key, { count: 1, resetAt: now + RATE_WINDOW });
-    return true;
-  }
-  if (entry.count >= RATE_LIMIT) return false;
-  entry.count++;
-  return true;
-}
+const RATE_WINDOW = 15 * 60; // seconds
 
 export async function POST(req: NextRequest) {
   try {
-    const ip = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ?? 'unknown';
+    const ip = getClientIp(req);
     const body = await req.json();
     const parsed = adminLoginSchema.safeParse(body);
     if (!parsed.success) {
       return NextResponse.json({ error: 'Invalid credentials' }, { status: 401 });
     }
 
-    const { email, password } = parsed.data;
-    if (!checkRate(ip, ipHits) || !checkRate(email.toLowerCase(), emailHits)) {
-      return NextResponse.json({ error: 'Too many attempts. Please try again later.' }, { status: 429 });
+    const { password } = parsed.data;
+    const email = normalizeEmail(parsed.data.email);
+    if (
+      !(await rateLimitHit(`admin-login:ip:${ip}`, RATE_LIMIT, RATE_WINDOW)) ||
+      !(await rateLimitHit(`admin-login:email:${email}`, RATE_LIMIT, RATE_WINDOW))
+    ) {
+      return rateLimitedResponse();
     }
 
     const { data: admin } = await supabaseAdmin

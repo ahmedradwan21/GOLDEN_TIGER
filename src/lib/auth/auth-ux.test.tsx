@@ -9,15 +9,28 @@ let passwordValid = false;
 let sessionCount = 0;
 let insertCount = 0;
 let lookupCount = 0;
+let verifyCount = 0;
+let rpcFails = false;
+// In-memory stand-in for the rate_limit_hit DB function (same windowed semantics).
+let hits = new Map<string, { count: number; resetAt: number }>();
+async function rpc(_name: string, a: { p_key: string; p_limit: number; p_window_seconds: number }) {
+  if (rpcFails) return { data: null, error: { message: 'DB_UNAVAILABLE' } };
+  const now = Date.now();
+  const e = hits.get(a.p_key);
+  if (!e || e.resetAt <= now) { hits.set(a.p_key, { count: 1, resetAt: now + a.p_window_seconds * 1000 }); return { data: true, error: null }; }
+  e.count++;
+  return { data: e.count <= a.p_limit, error: null };
+}
 const query = {
   select() { return this; }, eq() { return this; }, update() { return this; },
   insert() { insertCount++; return this; },
   async maybeSingle() { lookupCount++; return lookup; },
   async single() { return inserted; },
 };
-mock.module('@/lib/db-admin', () => ({ supabaseAdmin: { from: () => query } }));
+mock.module('server-only', () => ({}));
+mock.module('@/lib/db-admin', () => ({ supabaseAdmin: { from: () => query, rpc } }));
 mock.module('@/lib/auth/password', () => ({
-  verifyPassword: async () => passwordValid,
+  verifyPassword: async () => { verifyCount++; return passwordValid; },
   hashPassword: async () => 'test-hash',
 }));
 mock.module('@/lib/auth/session', () => ({
@@ -35,6 +48,9 @@ beforeEach(() => {
   sessionCount = 0;
   insertCount = 0;
   lookupCount = 0;
+  verifyCount = 0;
+  rpcFails = false;
+  hits = new Map();
 });
 function request(email = 'customer@example.com', password = 'test-password', ip = 'test-ip') {
   return new Request('http://localhost/api/auth', {
@@ -43,18 +59,42 @@ function request(email = 'customer@example.com', password = 'test-password', ip 
   }) as any;
 }
 
-test('login distinguishes an unregistered email without creating a session', async () => {
+test('unknown email returns the generic invalid-credentials error and still runs bcrypt', async () => {
   const response = await login.POST(request());
   expect(response.status).toBe(401);
-  expect((await response.json()).code).toBe('EMAIL_NOT_REGISTERED');
+  expect((await response.json()).code).toBe('INVALID_CREDENTIALS');
+  expect(verifyCount).toBe(1);
   expect(sessionCount).toBe(0);
 });
-test('login distinguishes a wrong password without creating a session', async () => {
+test('wrong password returns the same generic invalid-credentials error', async () => {
   lookup.data = { id: 'user', email: 'customer@example.com', password_hash: 'hash' };
   const response = await login.POST(request());
   expect(response.status).toBe(401);
-  expect((await response.json()).code).toBe('WRONG_PASSWORD');
+  expect((await response.json()).code).toBe('INVALID_CREDENTIALS');
   expect(sessionCount).toBe(0);
+});
+test('customer login allows 10 attempts per IP per 15 minutes, then 429 RATE_LIMITED', async () => {
+  for (let i = 0; i < 10; i++) expect((await login.POST(request(`u${i}@example.com`, 'x', 'login-ip'))).status).toBe(401);
+  const blocked = await login.POST(request('u11@example.com', 'x', 'login-ip'));
+  expect(blocked.status).toBe(429);
+  expect((await blocked.json()).code).toBe('RATE_LIMITED');
+});
+test('customer login limits 10 attempts per email across IPs, ignoring case and spaces', async () => {
+  for (let i = 0; i < 10; i++) await login.POST(request('Same@Example.com', 'x', `ip-${i}`));
+  expect((await login.POST(request('  same@example.com ', 'x', 'ip-new'))).status).toBe(429);
+});
+test('customer register allows 5 per IP per hour', async () => {
+  for (let i = 0; i < 5; i++) expect((await register.POST(request(`r${i}@example.com`, 'password1', 'reg-ip'))).status).toBe(200);
+  expect((await register.POST(request('r6@example.com', 'password1', 'reg-ip'))).status).toBe(429);
+});
+test('login and register fail closed when the rate-limit DB errors', async () => {
+  rpcFails = true;
+  expect((await login.POST(request())).status).toBe(429);
+  expect((await register.POST(request())).status).toBe(429);
+  expect(lookupCount).toBe(0);
+});
+test('401 responses map to the invalid-credentials message', () => {
+  expect(authErrorKey(authFailure({}, 401).code)).toBe('auth.error.invalidCredentials');
 });
 test('valid login still creates the existing session', async () => {
   lookup.data = { id: 'user', email: 'customer@example.com', password_hash: 'hash' };

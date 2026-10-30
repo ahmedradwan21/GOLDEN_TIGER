@@ -1,15 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getAdminSession } from '@/lib/auth/session';
+import { requireAdmin } from '@/lib/auth/require-admin';
 import { supabaseAdmin } from '@/lib/db-admin';
 import { ensureBrand } from '@/lib/brand-admin';
 import { CSV_TEMPLATE, importProductRows } from '@/lib/product-csv';
 
 export async function GET() {
-  if (!(await getAdminSession())) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  const auth = await requireAdmin(); if (!auth.ok) return auth.response;
   return new NextResponse('\uFEFF' + CSV_TEMPLATE, { headers: { 'Content-Type': 'text/csv; charset=utf-8', 'Content-Disposition': 'attachment; filename="products-template.csv"', 'Cache-Control': 'no-store' } });
 }
 export async function POST(req: NextRequest) {
-  if (!(await getAdminSession())) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  const auth = await requireAdmin(); if (!auth.ok) return auth.response;
   try {
     const form = await req.formData();
     const file = form.get('file');
@@ -33,5 +33,5 @@ export async function POST(req: NextRequest) {
       },
     });
     return NextResponse.json(summary);
-  } catch (e) { return NextResponse.json({ error: e instanceof Error ? e.message : 'Invalid CSV' }, { status: 400 }); }
+  } catch (e) { console.error('[products-import]', e); return NextResponse.json({ error: 'Invalid CSV' }, { status: 400 }); }
 }

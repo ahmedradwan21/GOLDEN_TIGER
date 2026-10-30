@@ -58,7 +58,7 @@ export function CampaignBanner() {
   useEffect(() => {
     async function load() {
       try {
-        const res = await fetch('/api/admin/campaigns');
+        const res = await fetch('/api/campaigns');
         if (!res.ok) return;
         const data = await res.json();
         const active = (data.campaigns ?? []).filter((c: ActiveCampaign) => c.isActive === true);

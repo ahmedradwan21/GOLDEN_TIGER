@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { supabase } from '@/lib/db';
+import { getClientIp, rateLimitHit } from '@/lib/rate-limit';
 
 const trackEventSchema = z.object({
   eventType: z.enum(['VISIT', 'IMPRESSION', 'VIEW', 'CLICK', 'ADD_TO_CART']),
@@ -16,22 +17,6 @@ const trackSchema = z.object({
 
 const BOT_PATTERNS = /bot|crawler|spider|crawling|slurp|baiduspider|yandexbot|facebookexternalhit|twitterbot|linkedinbot|semrushbot|ahrefsbot/i;
 
-const ipHits = new Map<string, { count: number; resetAt: number }>();
-const RATE_LIMIT = 100;
-const RATE_WINDOW = 60_000;
-
-function checkRateLimit(ip: string): boolean {
-  const now = Date.now();
-  const entry = ipHits.get(ip);
-  if (!entry || entry.resetAt < now) {
-    ipHits.set(ip, { count: 1, resetAt: now + RATE_WINDOW });
-    return true;
-  }
-  if (entry.count >= RATE_LIMIT) return false;
-  entry.count++;
-  return true;
-}
-
 function deriveDeviceType(ua: string): string {
   if (/mobile|android.*mobile|iphone|ipod/i.test(ua)) return 'mobile';
   if (/ipad|tablet|android(?!.*mobile)/i.test(ua)) return 'tablet';
@@ -40,8 +25,8 @@ function deriveDeviceType(ua: string): string {
 
 export async function POST(req: NextRequest) {
   try {
-    const ip = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ?? 'unknown';
-    if (!checkRateLimit(ip)) {
+    // Analytics fails open: a DB hiccup should not drop tracking for everyone.
+    if (!(await rateLimitHit(`track:ip:${getClientIp(req)}`, 100, 60, { failClosed: false }))) {
       return new NextResponse(null, { status: 429 });
     }
 

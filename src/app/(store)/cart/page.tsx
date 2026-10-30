@@ -1,10 +1,12 @@
 'use client';
 
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { ShoppingBag, Trash2, ArrowLeft, Truck } from 'lucide-react';
 import { useCart } from '@/context/CartContext';
 import { useI18n } from '@/context/I18nContext';
-import { formatPrice, computePriceBreakdown, DELIVERY_METHODS } from '@/lib/pricing';
+import { formatPrice, computePriceBreakdown } from '@/lib/pricing';
+import { toDeliveryMethod, type ShippingMethodRow } from '@/lib/shipping-methods';
 import { SafeImage } from '@/components/ui/SafeImage';
 import { QuantityStepper } from '@/components/ui/QuantityStepper';
 import { cn } from '@/lib/utils';
@@ -15,7 +17,14 @@ export default function CartPage() {
   const { t, dir, locale } = useI18n();
   const BackIcon = dir === 'rtl' ? ArrowLeft : ArrowLeft;
 
-  const breakdown = computePriceBreakdown(items, DELIVERY_METHODS[0]);
+  const [firstMethod, setFirstMethod] = useState<ShippingMethodRow | null>(null);
+  useEffect(() => {
+    fetch('/api/shipping-methods')
+      .then((r) => (r.ok ? r.json() : []))
+      .then((rows: ShippingMethodRow[]) => setFirstMethod(Array.isArray(rows) ? rows[0] ?? null : null))
+      .catch(() => {});
+  }, []);
+  const breakdown = computePriceBreakdown(items, firstMethod ? toDeliveryMethod(firstMethod, 'en') : null);
   const freeShipProgress = Math.min(
     100,
     (breakdown.subtotal / breakdown.freeShippingThreshold) * 100

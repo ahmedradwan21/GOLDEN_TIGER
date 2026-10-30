@@ -5,21 +5,17 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { z } from 'zod';
 import { toast } from 'sonner';
-import { Check, Lock, CreditCard, Truck, ChevronLeft, Loader as Loader2, ShieldCheck, Package, Pencil } from 'lucide-react';
+import { Check, Truck, ChevronLeft, Loader as Loader2, Package, Pencil, Wallet, Tag, X } from 'lucide-react';
+import { computeCouponDiscount } from '@/lib/coupon-discount';
 import { useCart } from '@/context/CartContext';
 import { useAuth } from '@/context/AuthContext';
 import { useI18n } from '@/context/I18nContext';
 import {
   formatPrice,
   computePriceBreakdown,
-  DELIVERY_METHODS,
 } from '@/lib/pricing';
-import {
-  processPayment,
-  luhnCheck,
-  formatCardNumber,
-  formatExpiry,
-} from '@/lib/payments/mockGateway';
+import { PAYMENT_METHODS, isPaymentMethod, type PaymentMethod, type PaymentInfo } from '@/lib/payment-methods';
+import { toDeliveryMethod, type ShippingMethodRow } from '@/lib/shipping-methods';
 import { SafeImage } from '@/components/ui/SafeImage';
 import { cn } from '@/lib/utils';
 import { productTitle } from '@/lib/localize';
@@ -30,21 +26,34 @@ import type { ShippingDetails, DeliveryMethod } from '@/types';
 const SHIPPING_SCHEMA = z.object({
   fullName: z.string().min(2, 'checkout.err.fullName'),
   email: z.string().email('checkout.err.email'),
-  phone: z.string().min(10, 'checkout.err.phone'),
+  phone: z.string().trim().regex(/^01\d{9}$/, 'checkout.err.phone'),
   addressLine1: z.string().min(3, 'checkout.err.address'),
   addressLine2: z.string().optional(),
   city: z.string().min(2, 'checkout.err.city'),
   stateOrRegion: z.string().min(2, 'checkout.err.state'),
-  postalCode: z.string().min(3, 'checkout.err.postal'),
-  country: z.string().min(2, 'checkout.err.country'),
+  secondaryPhone: z.string().trim().regex(/^(01\d{9})?$/, 'checkout.err.phone').optional(),
+  landmark: z.string().trim().min(2, 'checkout.err.landmark'),
+  preferredDeliveryTime: z.string().max(100).optional(),
+  deliveryNotes: z.string().max(500).optional(),
 });
-
-const COUNTRIES = [
-  'United States', 'Canada', 'United Kingdom', 'Australia', 'Germany', 'France', 'Japan', 'India',
-];
 
 const FORM_STORAGE_KEY = 'golden-tiger-checkout-form';
 const DELIVERY_STORAGE_KEY = 'golden-tiger-checkout-delivery';
+
+// Same visitor id for start / PATCH / complete; persisted so all calls match orders.session_id.
+function getCheckoutSessionId(): string {
+  if (typeof window === 'undefined') return '';
+  try {
+    let sid = localStorage.getItem('gt_sid');
+    if (!sid) {
+      sid = crypto.randomUUID();
+      localStorage.setItem('gt_sid', sid);
+    }
+    return sid;
+  } catch {
+    return '';
+  }
+}
 
 export default function CheckoutPage() {
   const router = useRouter();
@@ -56,24 +65,84 @@ export default function CheckoutPage() {
   const [step, setStep] = useState(1);
   const [shipping, setShipping] = useState<ShippingDetails>({
     fullName: '', email: '', phone: '', addressLine1: '', addressLine2: '',
-    city: '', stateOrRegion: '', postalCode: '', country: 'United States',
+    city: '', stateOrRegion: '', postalCode: '', country: 'Egypt', deliveryNotes: '',
+    secondaryPhone: '', landmark: '', preferredDeliveryTime: '',
   });
   const [errors, setErrors] = useState<Record<string, string>>({});
-  const [deliveryId, setDeliveryId] = useState('standard');
-  const [payment, setPayment] = useState({ nameOnCard: '', cardNumber: '', expiry: '', cvc: '' });
+  const [deliveryId, setDeliveryId] = useState('');
+  const [shippingRows, setShippingRows] = useState<ShippingMethodRow[]>([]);
+  const [submitError, setSubmitError] = useState('');
+  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod | ''>('');
   const [paymentError, setPaymentError] = useState('');
+  const [paymentInfo, setPaymentInfo] = useState<PaymentInfo | null>(null);
+  const submittingRef = useRef(false);
   const [processing, setProcessing] = useState(false);
   const [summaryOpen, setSummaryOpen] = useState(false);
+  const [couponInput, setCouponInput] = useState('');
+  const [couponError, setCouponError] = useState('');
+  const [applyingCoupon, setApplyingCoupon] = useState(false);
+  const [appliedCoupon, setAppliedCoupon] = useState<{ code: string; discountType: 'percentage' | 'fixed'; value: number } | null>(null);
   const formRef = useRef<HTMLFormElement>(null);
 
   const steps = [
     { num: 1, label: t('checkout.step.shipping'), icon: Truck },
     { num: 2, label: t('checkout.step.review'), icon: Package },
-    { num: 3, label: t('checkout.step.payment'), icon: CreditCard },
+    { num: 3, label: t('checkout.step.payment'), icon: Wallet },
   ];
 
-  const deliveryMethod = DELIVERY_METHODS.find((d) => d.id === deliveryId) || DELIVERY_METHODS[0];
+  const deliveryMethods: DeliveryMethod[] = shippingRows.map((r) => toDeliveryMethod(r, locale === 'ar' ? 'ar' : 'en'));
+  const deliveryMethod: DeliveryMethod | null = deliveryMethods.find((d) => d.id === deliveryId) || deliveryMethods[0] || null;
+
+  useEffect(() => {
+    fetch('/api/payment-info')
+      .then((r) => (r.ok ? r.json() : null))
+      .then((info: PaymentInfo | null) => setPaymentInfo(info))
+      .catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    fetch('/api/shipping-methods')
+      .then((r) => (r.ok ? r.json() : []))
+      .then((rows: ShippingMethodRow[]) => {
+        if (!Array.isArray(rows)) return;
+        setShippingRows(rows);
+        setDeliveryId((prev) => (rows.some((r) => r.id === prev) ? prev : rows[0]?.id ?? ''));
+      })
+      .catch(() => {});
+  }, []);
   const breakdown = computePriceBreakdown(items, deliveryMethod);
+  const discount = appliedCoupon
+    ? computeCouponDiscount({ discount_type: appliedCoupon.discountType, value: appliedCoupon.value }, breakdown.subtotal)
+    : 0;
+  const total = Math.max(0, breakdown.total - discount);
+
+  async function applyCoupon() {
+    const code = couponInput.trim();
+    if (!code) { setCouponError(t('checkout.coupon.err.not_found')); return; }
+    setApplyingCoupon(true);
+    setCouponError('');
+    try {
+      const res = await fetch('/api/checkout/validate-coupon', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ code, subtotalCents: breakdown.subtotal }),
+      });
+      const data = await res.json().catch(() => null);
+      if (!res.ok) {
+        const key = `checkout.coupon.err.${data?.error ?? 'server'}`;
+        const msg = t(key);
+        setCouponError(msg === key ? t('checkout.coupon.err.server') : msg);
+        return;
+      }
+      setAppliedCoupon({ code: data.code, discountType: data.discountType, value: data.value });
+      setCouponInput('');
+      toast.success(t('checkout.coupon.applied'));
+    } catch {
+      setCouponError(t('checkout.coupon.err.server'));
+    } finally {
+      setApplyingCoupon(false);
+    }
+  }
 
   useEffect(() => {
     if (user) {
@@ -85,18 +154,28 @@ export default function CheckoutPage() {
     }
   }, [user]);
 
+  // Stable key from productId:quantity pairs so /start runs once per cart contents, not per array identity.
+  const cartKey = items.map((i) => `${i.id}:${i.quantity}`).sort().join('|');
+  const startedKeyRef = useRef<string | null>(null);
+  const [startError, setStartError] = useState('');
+  const [startAttempt, setStartAttempt] = useState(0);
+
   useEffect(() => {
     if (!hydrated || items.length === 0) return;
+    const runKey = `${cartKey}#${startAttempt}`;
+    if (startedKeyRef.current === runKey) return;
+    startedKeyRef.current = runKey;
 
-    trackInitiateCheckout({
-      contentIds: items.map((i) => i.id),
-      value: breakdown.total,
-      numItems: breakdown.itemCount,
-    });
+    if (startAttempt === 0) {
+      trackInitiateCheckout({
+        contentIds: items.map((i) => i.id),
+        value: total,
+        numItems: breakdown.itemCount,
+      });
+    }
 
-    const sid = typeof window !== 'undefined'
-      ? localStorage.getItem('gt_sid') || crypto.randomUUID()
-      : '';
+    setStartError('');
+    const sid = getCheckoutSessionId();
     fetch('/api/checkout/start', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -105,14 +184,23 @@ export default function CheckoutPage() {
         items: items.map((i) => ({ productId: i.id, quantity: i.quantity })),
       }),
     })
-      .then((r) => r.json())
-      .then((data) => {
-        if (data.orderId) setOrderId(data.orderId);
+      .then(async (r) => {
+        const data = await r.json().catch(() => null);
+        if (startedKeyRef.current !== runKey) return; // superseded by a newer cart
+        if (r.ok && data?.orderId) {
+          setOrderId(data.orderId);
+        } else {
+          setOrderId(null);
+          setStartError(data?.error || t('checkout.err.submitFailed'));
+        }
       })
       .catch(() => {
-        // Non-critical: checkout still works with sessionStorage fallback
+        if (startedKeyRef.current !== runKey) return;
+        setOrderId(null);
+        setStartError(t('checkout.err.submitFailed'));
       });
-  }, [hydrated, items]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hydrated, cartKey, startAttempt]);
 
   useEffect(() => {
     if (hydrated && items.length === 0) {
@@ -125,7 +213,7 @@ export default function CheckoutPage() {
       const formRaw = sessionStorage.getItem(FORM_STORAGE_KEY);
       if (formRaw) {
         const parsed = JSON.parse(formRaw);
-        setShipping(parsed);
+        setShipping((prev) => ({ ...prev, ...parsed, postalCode: '', country: 'Egypt' }));
       }
       const deliveryRaw = sessionStorage.getItem(DELIVERY_STORAGE_KEY);
       if (deliveryRaw) {
@@ -173,9 +261,10 @@ export default function CheckoutPage() {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
+          sessionId: getCheckoutSessionId(),
           email: shipping.email,
           shippingAddress: shipping,
-          deliveryMethod: deliveryId,
+          deliveryMethod: deliveryId || undefined,
         }),
       }).catch(() => {
         // Non-critical
@@ -196,128 +285,88 @@ export default function CheckoutPage() {
     }
   }
 
-  async function handlePaymentSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    setPaymentError('');
-
-    if (!payment.nameOnCard.trim()) {
-      setPaymentError(t('checkout.err.nameOnCard'));
+  async function handleConfirmOrder() {
+    // Prevent duplicate submissions (double clicks / repeated taps).
+    if (submittingRef.current) return;
+    setSubmitError('');
+    if (!isPaymentMethod(paymentMethod)) {
+      setPaymentError(t('checkout.err.paymentMethod'));
+      toast.error(t('checkout.err.paymentMethod'));
       return;
     }
-    const digits = payment.cardNumber.replace(/\D/g, '');
-    if (digits.length < 16) {
-      setPaymentError(t('checkout.err.cardDigits'));
+    if (!orderId) {
+      setSubmitError(t('checkout.err.submitFailed'));
+      toast.error(t('checkout.err.submitFailed'));
       return;
     }
-    if (!luhnCheck(payment.cardNumber)) {
-      setPaymentError(t('checkout.err.cardInvalid'));
-      return;
-    }
-    if (!/^\d{2}\/\d{2}$/.test(payment.expiry)) {
-      setPaymentError(t('checkout.err.expiry'));
-      return;
-    }
-    if (!/^\d{3,4}$/.test(payment.cvc)) {
-      setPaymentError(t('checkout.err.cvc'));
-      return;
-    }
-
+    submittingRef.current = true;
     setProcessing(true);
-    const result = await processPayment({
-      nameOnCard: payment.nameOnCard,
-      cardNumber: digits,
-      expiry: payment.expiry,
-      cvc: payment.cvc,
-      amount: breakdown.total,
-    });
-
-    if (!result.success) {
+    const fail = (msg: string) => {
+      submittingRef.current = false;
       setProcessing(false);
-      setPaymentError(result.message);
-      toast.error(result.message);
-      return;
-    }
-
-    if (orderId) {
-      const sid = typeof window !== 'undefined'
-        ? localStorage.getItem('gt_sid') || crypto.randomUUID()
-        : '';
-      try {
-        const completeRes = await fetch(`/api/checkout/${orderId}/complete`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            sessionId: sid,
-            paymentRef: `mock_${digits.slice(-4)}`,
-          }),
-        });
-
-        if (completeRes.status === 409) {
-          const conflict = await completeRes.json();
-          setProcessing(false);
-          const issueMsg = conflict.items?.map((i: { title: string; available: number; requested: number }) =>
-            t('checkout.err.stockItem').replace('{title}', i.title).replace('{available}', String(i.available)).replace('{requested}', String(i.requested))
-          ).join(locale === 'ar' ? '، ' : ', ') || t('checkout.err.outOfStock');
-          toast.error(`${t('checkout.err.stockIssue')} ${issueMsg}`);
-          setPaymentError(`${t('checkout.err.noLongerAvailable')} ${issueMsg}`);
-          return;
-        }
-
-        if (completeRes.ok) {
-          const completed = await completeRes.json();
-          clearCart();
-          sessionStorage.removeItem(FORM_STORAGE_KEY);
-          sessionStorage.removeItem(DELIVERY_STORAGE_KEY);
-          const orderSummary = {
-            orderNumber: completed.orderNumber,
-            items: [...items],
-            shippingDetails: shipping,
-            deliveryMethod,
-            subtotal: breakdown.subtotal,
-            tax: breakdown.tax,
-            shipping: breakdown.shipping,
-            total: breakdown.total,
-            placedAt: new Date().toISOString(),
-          };
-          try {
-            sessionStorage.setItem(`golden-tiger-order-${completed.orderNumber}`, JSON.stringify(orderSummary));
-          } catch {
-            // ignore
-          }
-          setProcessing(false);
-          toast.success(t('checkout.paymentSuccess'));
-          router.push(`/order-confirmation/${completed.orderNumber}`);
-          return;
-        }
-      } catch {
-        // Fall through to sessionStorage-only path
-      }
-    }
-
-    setProcessing(false);
-    const { generateOrderNumber } = await import('@/lib/payments/mockGateway');
-    const orderNumber = generateOrderNumber();
-    const orderSummary = {
-      orderNumber,
-      items: [...items],
-      shippingDetails: shipping,
-      deliveryMethod,
-      subtotal: breakdown.subtotal,
-      tax: breakdown.tax,
-      shipping: breakdown.shipping,
-      total: breakdown.total,
-      placedAt: new Date().toISOString(),
+      setSubmitError(msg);
+      toast.error(msg);
     };
+
+    const sid = getCheckoutSessionId();
     try {
-      sessionStorage.setItem(`golden-tiger-order-${orderNumber}`, JSON.stringify(orderSummary));
+      // Make sure the latest customer details and delivery method are saved before submitting.
+      const saveRes = await fetch(`/api/checkout/${orderId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sessionId: sid, email: shipping.email, shippingAddress: shipping, deliveryMethod: deliveryId || undefined }),
+      });
+      if (!saveRes.ok) return fail(t('checkout.err.submitFailed'));
+
+      const completeRes = await fetch(`/api/checkout/${orderId}/complete`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sessionId: sid, paymentMethod, couponCode: appliedCoupon?.code ?? null }),
+      });
+
+      if (completeRes.status === 409) {
+        const conflict = await completeRes.json();
+        if (!conflict.items) return fail(t('checkout.err.submitFailed'));
+        const issueMsg = conflict.items.map((i: { title: string; available: number; requested: number }) =>
+          t('checkout.err.stockItem').replace('{title}', i.title).replace('{available}', String(i.available ?? 0)).replace('{requested}', String(i.requested))
+        ).join(locale === 'ar' ? '، ' : ', ') || t('checkout.err.outOfStock');
+        return fail(`${t('checkout.err.noLongerAvailable')} ${issueMsg}`);
+      }
+      if (completeRes.status === 422) {
+        const body = await completeRes.json().catch(() => null);
+        if (body?.couponError) {
+          setAppliedCoupon(null);
+          return fail(t(`checkout.coupon.err.${body.couponError}`));
+        }
+      }
+      if (!completeRes.ok) return fail(t('checkout.err.submitFailed'));
+
+      const completed = await completeRes.json();
+      clearCart();
+      sessionStorage.removeItem(FORM_STORAGE_KEY);
+      sessionStorage.removeItem(DELIVERY_STORAGE_KEY);
+      const orderSummary = {
+        orderNumber: completed.orderNumber,
+        items: [...items],
+        shippingDetails: shipping,
+        deliveryMethod: deliveryMethod ?? { id: '', name: '', description: '', fee: 0, estimatedDays: '' },
+        subtotal: breakdown.subtotal,
+        tax: breakdown.tax,
+        shipping: breakdown.shipping,
+        discount,
+        total: completed.totalCents ?? total,
+        placedAt: new Date().toISOString(),
+      };
+      try {
+        sessionStorage.setItem(`golden-tiger-order-${completed.orderNumber}`, JSON.stringify(orderSummary));
+      } catch {
+        // ignore
+      }
+      toast.success(t('checkout.orderSubmitted'));
+      router.push(`/order-confirmation/${completed.orderNumber}`);
     } catch {
-      // ignore
+      fail(t('checkout.err.submitFailed'));
     }
-    clearCart();
-    sessionStorage.removeItem(FORM_STORAGE_KEY);
-    sessionStorage.removeItem(DELIVERY_STORAGE_KEY);
-    toast.success(t('checkout.paymentSuccess'));
-    router.push(`/order-confirmation/${orderNumber}`);
   }
 
   return (
@@ -368,6 +417,19 @@ export default function CheckoutPage() {
         ))}
       </div>
 
+      {startError && (
+        <div role="alert" className="mb-6 flex flex-col sm:flex-row sm:items-center gap-3 rounded-xl border border-danger/40 bg-danger/10 p-4">
+          <p className="flex-1 text-sm text-danger">{startError}</p>
+          <button
+            type="button"
+            onClick={() => setStartAttempt((n) => n + 1)}
+            className="rounded-lg bg-gold px-4 py-2 text-sm font-semibold text-background hover:opacity-90"
+          >
+            {t('checkout.retry')}
+          </button>
+        </div>
+      )}
+
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Main content */}
         <div className="lg:col-span-2">
@@ -403,20 +465,21 @@ export default function CheckoutPage() {
                     onChange={(e) => updateShipping('phone', e.target.value)}
                     autoComplete="tel"
                     className={inputClass(errors.phone)}
-                    placeholder="+1 234 567 8900"
+                    placeholder="01xxxxxxxxx"
+                    inputMode="numeric"
+                    maxLength={11}
                   />
                 </FormField>
-                <FormField label={t('checkout.field.country')} error={errors.country}>
-                  <select
-                    value={shipping.country}
-                    onChange={(e) => updateShipping('country', e.target.value)}
-                    autoComplete="country"
-                    className={inputClass(errors.country)}
-                  >
-                    {COUNTRIES.map((c) => (
-                      <option key={c} value={c}>{t(`country.${c}`)}</option>
-                    ))}
-                  </select>
+                <FormField label={t('checkout.field.secondaryPhone')} error={errors.secondaryPhone}>
+                  <input
+                    type="tel"
+                    value={shipping.secondaryPhone ?? ''}
+                    onChange={(e) => updateShipping('secondaryPhone', e.target.value)}
+                    className={inputClass(errors.secondaryPhone)}
+                    placeholder="01xxxxxxxxx"
+                    inputMode="numeric"
+                    maxLength={11}
+                  />
                 </FormField>
                 <FormField label={t('checkout.field.addressLine1')} error={errors.addressLine1} full>
                   <input
@@ -458,14 +521,33 @@ export default function CheckoutPage() {
                     placeholder={t('placeholder.state')}
                   />
                 </FormField>
-                <FormField label={t('checkout.field.postalCode')} error={errors.postalCode}>
+                <FormField label={t('checkout.field.landmark')} error={errors.landmark} full>
                   <input
                     type="text"
-                    value={shipping.postalCode}
-                    onChange={(e) => updateShipping('postalCode', e.target.value)}
-                    autoComplete="postal-code"
-                    className={inputClass(errors.postalCode)}
-                    placeholder="10001"
+                    value={shipping.landmark ?? ''}
+                    onChange={(e) => updateShipping('landmark', e.target.value)}
+                    className={inputClass(errors.landmark)}
+                    placeholder={t('placeholder.landmark')}
+                  />
+                </FormField>
+                <FormField label={t('checkout.field.preferredDeliveryTime')} error={errors.preferredDeliveryTime} full>
+                  <input
+                    type="text"
+                    value={shipping.preferredDeliveryTime ?? ''}
+                    onChange={(e) => updateShipping('preferredDeliveryTime', e.target.value)}
+                    maxLength={100}
+                    className={inputClass(errors.preferredDeliveryTime)}
+                    placeholder={t('placeholder.preferredDeliveryTime')}
+                  />
+                </FormField>
+                <FormField label={t('checkout.field.deliveryNotes')} error={errors.deliveryNotes} full>
+                  <textarea
+                    value={shipping.deliveryNotes ?? ''}
+                    onChange={(e) => updateShipping('deliveryNotes', e.target.value)}
+                    maxLength={500}
+                    rows={3}
+                    className={inputClass(errors.deliveryNotes)}
+                    placeholder={t('placeholder.deliveryNotes')}
                   />
                 </FormField>
               </div>
@@ -474,9 +556,9 @@ export default function CheckoutPage() {
               <div className="pt-4 border-t border-border">
                 <h3 className="text-sm font-semibold text-text mb-3">{t('checkout.deliveryMethod')}</h3>
                 <div className="space-y-2">
-                  {DELIVERY_METHODS.map((method) => {
+                  {deliveryMethods.map((method) => {
                     const isSelected = deliveryId === method.id;
-                    const isFree = method.freeThreshold && breakdown.subtotal >= method.freeThreshold;
+                    const isFree = method.fee === 0 || (!!method.freeThreshold && breakdown.subtotal >= method.freeThreshold);
                     return (
                       <label
                         key={method.id}
@@ -502,8 +584,8 @@ export default function CheckoutPage() {
                           {isSelected && <div className="h-2 w-2 rounded-full bg-gold" />}
                         </div>
                         <div className="flex-1">
-                          <p className="text-sm font-medium text-text">{t(`delivery.${method.id}.name`)}</p>
-                          <p className="text-xs text-muted">{t(`delivery.${method.id}.desc`)}</p>
+                          <p className="text-sm font-medium text-text">{method.name}</p>
+                          {method.estimatedDays ? <p className="text-xs text-muted">{method.estimatedDays}</p> : null}
                         </div>
                         <span className={cn('text-sm font-semibold', isFree ? 'text-success' : 'text-text')}>
                           {isFree ? t('common.free') : formatPrice(method.fee)}
@@ -540,9 +622,12 @@ export default function CheckoutPage() {
                 <div className="text-sm text-muted space-y-0.5 p-3 rounded-lg bg-surface-elevated">
                   <p className="text-text font-medium">{shipping.fullName}</p>
                   <p>{shipping.addressLine1}{shipping.addressLine2 ? `, ${shipping.addressLine2}` : ''}</p>
-                  <p>{shipping.city}, {shipping.stateOrRegion} {shipping.postalCode}</p>
+                  <p>{shipping.city}, {shipping.stateOrRegion}</p>
                   <p>{shipping.country}</p>
-                  <p>{shipping.email} | {shipping.phone}</p>
+                  {shipping.landmark ? <p>{t('checkout.field.landmark')}: {shipping.landmark}</p> : null}
+                  <p>{shipping.email} | {shipping.phone}{shipping.secondaryPhone ? ` | ${shipping.secondaryPhone}` : ''}</p>
+                  {shipping.preferredDeliveryTime ? <p>{t('checkout.field.preferredDeliveryTime')}: {shipping.preferredDeliveryTime}</p> : null}
+                  {shipping.deliveryNotes ? <p>{shipping.deliveryNotes}</p> : null}
                 </div>
               </div>
 
@@ -550,7 +635,7 @@ export default function CheckoutPage() {
               <div>
                 <h3 className="text-sm font-semibold text-text mb-2">{t('checkout.deliveryMethod')}</h3>
                 <div className="text-sm text-muted p-3 rounded-lg bg-surface-elevated">
-                  <span className="text-text font-medium">{t(`delivery.${deliveryMethod.id}.name`)}</span> - {t(`delivery.${deliveryMethod.id}.desc`)}
+                  <span className="text-text font-medium">{deliveryMethod?.name}</span>{deliveryMethod?.estimatedDays ? ` - ${deliveryMethod.estimatedDays}` : ''}
                 </div>
               </div>
 
@@ -584,16 +669,19 @@ export default function CheckoutPage() {
                 <div className="flex justify-between"><span className="text-muted">{t('common.subtotal')}</span><span className="text-text">{formatPrice(breakdown.subtotal)}</span></div>
                 <div className="flex justify-between"><span className="text-muted">{t('checkout.tax8pct')}</span><span className="text-text">{formatPrice(breakdown.tax)}</span></div>
                 <div className="flex justify-between"><span className="text-muted">{t('common.shipping')}</span><span className={cn(breakdown.shipping === 0 ? 'text-success' : 'text-text')}>{breakdown.shipping === 0 ? t('common.free') : formatPrice(breakdown.shipping)}</span></div>
-                <div className="flex justify-between border-t border-border pt-2"><span className="text-text font-semibold">{t('common.total')}</span><span className="text-lg font-bold text-gold">{formatPrice(breakdown.total)}</span></div>
+                {discount > 0 && (<div className="flex justify-between"><span className="text-muted">{t('checkout.coupon.discount').replace('{code}', appliedCoupon?.code ?? '')}</span><span className="text-success">−{formatPrice(discount)}</span></div>)}
+                <div className="flex justify-between border-t border-border pt-2"><span className="text-text font-semibold">{t('common.total')}</span><span className="text-lg font-bold text-gold">{formatPrice(total)}</span></div>
               </div>
 
               <button
+                type="button"
                 onClick={() => setStep(3)}
                 className="w-full h-12 gold-button rounded-lg text-sm font-semibold"
               >
                 {t('checkout.continueToPayment')}
               </button>
               <button
+                type="button"
                 onClick={() => setStep(1)}
                 className="w-full h-10 rounded-lg border border-border text-sm font-medium text-text hover:bg-surface-elevated transition-colors"
               >
@@ -602,118 +690,88 @@ export default function CheckoutPage() {
             </div>
           )}
 
-          {/* Step 3: Payment */}
+          {/* Step 3: Payment method */}
           {step === 3 && (
-            <form onSubmit={handlePaymentSubmit} className="bg-surface rounded-xl border border-border p-5 sm:p-6 space-y-4 relative">
-              {/* Processing overlay */}
-              {processing && (
-                <div className="absolute inset-0 z-10 bg-surface/90 rounded-xl flex flex-col items-center justify-center">
-                  <Loader2 className="h-10 w-10 text-gold animate-spin mb-4" />
-                  <p className="text-sm text-text font-medium">{t('checkout.processingPayment')}</p>
-                  <p className="text-xs text-muted mt-1">{t('checkout.doNotClose')}</p>
+            <div className="bg-surface rounded-xl border border-border p-5 sm:p-6 space-y-6">
+              <fieldset>
+                <legend className="font-heading text-lg font-bold text-text mb-3">{t('checkout.paymentMethod')}</legend>
+                <div className="space-y-2" role="radiogroup" aria-invalid={!!paymentError}>
+                  {PAYMENT_METHODS.map((pm) => {
+                    const isSelected = paymentMethod === pm;
+                    const hint =
+                      pm === 'instapay'
+                        ? paymentInfo?.instapay_handle ? t('checkout.pay.instapayHint').replace('{value}', paymentInfo.instapay_handle) : ''
+                        : pm === 'vodafone_cash'
+                          ? paymentInfo?.vodafone_cash_number ? t('checkout.pay.vodafoneHint').replace('{value}', paymentInfo.vodafone_cash_number) : ''
+                          : t('checkout.pay.codHint');
+                    return (
+                      <label
+                        key={pm}
+                        className={cn(
+                          'flex items-start gap-3 p-3 rounded-lg border cursor-pointer transition-colors',
+                          isSelected ? 'border-gold bg-gold/5' : paymentError ? 'border-danger' : 'border-border hover:border-muted'
+                        )}
+                      >
+                        <input
+                          type="radio"
+                          name="paymentMethod"
+                          value={pm}
+                          checked={isSelected}
+                          onChange={() => { setPaymentMethod(pm); setPaymentError(''); }}
+                          className="sr-only"
+                        />
+                        <div className={cn(
+                          'mt-0.5 h-4 w-4 rounded-full border-2 flex items-center justify-center shrink-0',
+                          isSelected ? 'border-gold' : 'border-muted'
+                        )}>
+                          {isSelected && <div className="h-2 w-2 rounded-full bg-gold" />}
+                        </div>
+                        <div className="flex-1">
+                          <p className="text-sm font-medium text-text">{t(`checkout.pay.${pm}`)}</p>
+                          {isSelected && hint ? <p dir="auto" className="text-xs text-muted mt-1">{hint}</p> : null}
+                          {isSelected && pm !== 'cod' ? <p className="text-xs text-muted mt-1">{t('checkout.pay.screenshotHint')}</p> : null}
+                        </div>
+                      </label>
+                    );
+                  })}
                 </div>
-              )}
+                {paymentError && <p className="text-xs text-danger mt-2">{paymentError}</p>}
+              </fieldset>
 
-              {/* Demo banner */}
-              <div className="flex items-center gap-2 p-3 rounded-lg bg-tiger-orange/10 border border-tiger-orange/30">
-                <span className="text-xs text-tiger-orange font-medium">
-                  {t('checkout.demoBanner')}
-                </span>
-              </div>
+              <div className="flex justify-between border-t border-border pt-4 text-sm"><span className="text-text font-semibold">{t('common.total')}</span><span className="text-lg font-bold text-gold">{formatPrice(total)}</span></div>
 
-              <h2 className="font-heading text-lg font-bold text-text">{t('checkout.paymentDetails')}</h2>
-
-              {/* Secured badge */}
-              <div className="flex items-center gap-2 text-sm text-muted">
-                <Lock className="h-4 w-4 text-gold" />
-                {t('checkout.securedBy')} <span className="font-medium text-gold">{t('checkout.goldenShield')}</span>
-              </div>
-
-              <FormField label={t('checkout.field.nameOnCard')} error={paymentError && !payment.nameOnCard ? paymentError : ''}>
-                <input
-                  type="text"
-                  value={payment.nameOnCard}
-                  onChange={(e) => setPayment({ ...payment, nameOnCard: e.target.value })}
-                  autoComplete="cc-name"
-                  className={inputClass()}
-                  placeholder={t('placeholder.fullName')}
-                />
-              </FormField>
-
-              <FormField label={t('checkout.field.cardNumber')} error="">
-                <input
-                  type="text"
-                  inputMode="numeric"
-                  value={payment.cardNumber}
-                  onChange={(e) => setPayment({ ...payment, cardNumber: formatCardNumber(e.target.value) })}
-                  autoComplete="cc-number"
-                  className={inputClass()}
-                  placeholder="4242 4242 4242 4242"
-                  maxLength={19}
-                />
-              </FormField>
-
-              <div className="grid grid-cols-2 gap-4">
-                <FormField label={t('checkout.field.expiry')} error="">
-                  <input
-                    type="text"
-                    inputMode="numeric"
-                    value={payment.expiry}
-                    onChange={(e) => setPayment({ ...payment, expiry: formatExpiry(e.target.value) })}
-                    autoComplete="cc-exp"
-                    className={inputClass()}
-                    placeholder="12/27"
-                    maxLength={5}
-                  />
-                </FormField>
-                <FormField label={t('checkout.field.cvc')} error="">
-                  <input
-                    type="text"
-                    inputMode="numeric"
-                    value={payment.cvc}
-                    onChange={(e) => setPayment({ ...payment, cvc: e.target.value.replace(/\D/g, '').slice(0, 4) })}
-                    autoComplete="cc-csc"
-                    className={inputClass()}
-                    placeholder="123"
-                    maxLength={4}
-                  />
-                </FormField>
-              </div>
-
-              {paymentError && (
+              {submitError && (
                 <div className="p-3 rounded-lg bg-danger/10 border border-danger/30">
-                  <p className="text-sm text-danger">{paymentError}</p>
+                  <p className="text-sm text-danger">{submitError}</p>
                 </div>
               )}
 
-              <div className="flex items-center gap-2 text-xs text-muted">
-                <ShieldCheck className="h-3.5 w-3.5 text-gold" />
-                {t('checkout.encryptedNote')}
-              </div>
-
-              <button type="submit" disabled={processing} className="w-full h-12 gold-button rounded-lg text-sm font-semibold flex items-center justify-center gap-2">
+              <button
+                type="button"
+                onClick={handleConfirmOrder}
+                disabled={processing}
+                className="w-full h-12 gold-button rounded-lg text-sm font-semibold flex items-center justify-center gap-2 disabled:opacity-70"
+              >
                 {processing ? (
                   <>
                     <Loader2 className="h-4 w-4 animate-spin" />
                     {t('checkout.processing')}
                   </>
                 ) : (
-                  <>
-                    <Lock className="h-4 w-4" />
-                    {t('checkout.pay').replace('{amount}', formatPrice(breakdown.total))}
-                  </>
+                  t('checkout.confirmOrder')
                 )}
               </button>
               <button
                 type="button"
-                onClick={() => setStep(2)}
                 disabled={processing}
+                onClick={() => setStep(2)}
                 className="w-full h-10 rounded-lg border border-border text-sm font-medium text-text hover:bg-surface-elevated transition-colors"
               >
                 {t('checkout.backToReview')}
               </button>
-            </form>
+            </div>
           )}
+
         </div>
 
         {/* Order summary sidebar */}
@@ -724,7 +782,7 @@ export default function CheckoutPage() {
             className="w-full lg:hidden flex items-center justify-between p-4 rounded-lg bg-surface border border-border mb-4"
           >
             <span className="text-sm font-semibold text-text">
-              {t('checkout.orderSummaryWithTotal').replace('{total}', formatPrice(breakdown.total))}
+              {t('checkout.orderSummaryWithTotal').replace('{total}', formatPrice(total))}
             </span>
             <ChevronLeft className={cn('h-4 w-4 text-muted transition-transform', summaryOpen && '-rotate-90')} />
           </button>
@@ -757,13 +815,55 @@ export default function CheckoutPage() {
               ))}
             </div>
 
+            <div className="border-t border-border pt-4 pb-4">
+              <label htmlFor="coupon-code" className="block text-xs font-medium text-muted mb-1.5">{t('checkout.coupon.label')}</label>
+              {appliedCoupon ? (
+                <div className="flex items-center justify-between gap-2 h-10 px-3 rounded-lg border border-gold/40 bg-gold/10 text-sm">
+                  <span className="flex items-center gap-2 text-gold font-medium" dir="ltr"><Tag className="h-4 w-4" />{appliedCoupon.code}</span>
+                  <button
+                    type="button"
+                    disabled={processing}
+                    onClick={() => setAppliedCoupon(null)}
+                    className="text-muted hover:text-text"
+                    aria-label={t('checkout.coupon.remove')}
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
+                </div>
+              ) : (
+                <div className="flex gap-2">
+                  <input
+                    id="coupon-code"
+                    dir="ltr"
+                    maxLength={64}
+                    value={couponInput}
+                    onChange={(e) => { setCouponInput(e.target.value); setCouponError(''); }}
+                    onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); applyCoupon(); } }}
+                    placeholder={t('checkout.coupon.placeholder')}
+                    className={cn(inputClass(couponError || undefined), 'flex-1 uppercase')}
+                  />
+                  <button
+                    type="button"
+                    onClick={applyCoupon}
+                    disabled={applyingCoupon || items.length === 0}
+                    className="h-10 px-4 rounded-lg gold-button text-sm font-semibold flex items-center gap-2 disabled:opacity-70"
+                  >
+                    {applyingCoupon ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+                    {t('checkout.coupon.apply')}
+                  </button>
+                </div>
+              )}
+              {couponError && <p className="text-xs text-danger mt-1">{couponError}</p>}
+            </div>
+
             <div className="border-t border-border pt-4 space-y-2 text-sm">
               <div className="flex justify-between"><span className="text-muted">{t('common.subtotal')}</span><span className="text-text">{formatPrice(breakdown.subtotal)}</span></div>
               <div className="flex justify-between"><span className="text-muted">{t('common.tax')}</span><span className="text-text">{formatPrice(breakdown.tax)}</span></div>
               <div className="flex justify-between"><span className="text-muted">{t('common.shipping')}</span><span className={cn(breakdown.shipping === 0 && 'text-success')}>{breakdown.shipping === 0 ? t('common.free') : formatPrice(breakdown.shipping)}</span></div>
+              {discount > 0 && (<div className="flex justify-between"><span className="text-muted">{t('checkout.coupon.discount').replace('{code}', appliedCoupon?.code ?? '')}</span><span className="text-success">−{formatPrice(discount)}</span></div>)}
               <div className="flex justify-between border-t border-border pt-2">
                 <span className="text-text font-semibold">{t('common.total')}</span>
-                <span className="text-xl font-bold text-gold">{formatPrice(breakdown.total)}</span>
+                <span className="text-xl font-bold text-gold">{formatPrice(total)}</span>
               </div>
             </div>
           </div>

@@ -1,16 +1,16 @@
+import { serverError } from '@/lib/api/errors';
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/db-admin';
-import { getAdminSession } from '@/lib/auth/session';
+import { requireAdmin } from '@/lib/auth/require-admin';
 import { ensureBrand } from '@/lib/brand-admin';
 import { normalizeProductImages } from '@/lib/product-images';
 import { normalizeBannerFields } from '@/lib/homepage-banners';
 import { revalidateHomepage } from '@/lib/revalidate-home';
 
 export async function GET(req: NextRequest) {
-  const session = await getAdminSession();
-  if (!session) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
+  const auth = await requireAdmin();
+  if (!auth.ok) return auth.response;
+  const session = auth.admin;
 
   const { searchParams } = new URL(req.url);
   const page = parseInt(searchParams.get('page') ?? '1', 10);
@@ -36,7 +36,7 @@ export async function GET(req: NextRequest) {
 
     const { data, count, error } = await query;
     if (error) {
-      return NextResponse.json({ error: error.message }, { status: 500 });
+      return serverError(error, 500);
     }
 
     return NextResponse.json({
@@ -52,10 +52,9 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
-  const session = await getAdminSession();
-  if (!session) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
+  const auth = await requireAdmin();
+  if (!auth.ok) return auth.response;
+  const session = auth.admin;
 
   try {
     const body = await req.json();
@@ -95,7 +94,7 @@ export async function POST(req: NextRequest) {
       .single();
 
     if (error) {
-      return NextResponse.json({ error: error.message }, { status: 400 });
+      return serverError(error, 400);
     }
 
     revalidateHomepage();

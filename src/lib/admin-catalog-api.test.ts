@@ -1,3 +1,4 @@
+import { sessionMockBase } from '@/test/session-mock';
 import { expect, mock, test } from 'bun:test';
 let admin = false;
 let customer: { email:string } | null = null;
@@ -17,7 +18,7 @@ const query = {
 };
 mock.module('@/lib/db-admin', () => ({supabaseAdmin:{from(name:string){table=name;return query;}}}));
 mock.module('@/lib/brand-admin', () => ({ensureBrand: async (name:string) => name}));
-mock.module('@/lib/auth/session', () => ({getAdminSession:async () => admin?{adminId:'a'}:null,getSession:async () => customer}));
+mock.module('@/lib/auth/session', () => ({ ...sessionMockBase,getAdminSession:async () => admin?{adminId:'a'}:null,getSession:async () => customer}));
 mock.module('@/lib/data/catalog-settings', () => ({getDisplayCoupons:async (email?:string) => {scope=email??'public';return [];} }));
 const brands = await import('../app/api/admin/brands/route');
 const categories = await import('../app/api/admin/categories/route');

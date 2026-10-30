@@ -1,6 +1,7 @@
+import { serverError } from '@/lib/api/errors';
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/db-admin';
-import { getAdminSession } from '@/lib/auth/session';
+import { requireAdmin } from '@/lib/auth/require-admin';
 
 /**
  * One-time admin-only seed route.
@@ -1389,10 +1390,9 @@ const SEED_PRODUCTS: SeedProduct[] = [
 ];
 
 async function runSeed(req: NextRequest) {
-  const session = await getAdminSession();
-  if (!session) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
+  const auth = await requireAdmin();
+  if (!auth.ok) return auth.response;
+  const session = auth.admin;
 
   const force = new URL(req.url).searchParams.get('force') === 'true';
   const ids = SEED_PRODUCTS.map((p) => p.id);
@@ -1406,7 +1406,7 @@ async function runSeed(req: NextRequest) {
     if (countError) {
       console.error('[seed-products] existence check failed:', countError);
       return NextResponse.json(
-        { error: `Failed to check existing products: ${countError.message}` },
+        { error: "Failed to check existing products" },
         { status: 500 },
       );
     }
@@ -1429,7 +1429,7 @@ async function runSeed(req: NextRequest) {
     if (error) {
       console.error('[seed-products] upsert failed:', error);
       return NextResponse.json(
-        { error: `Upsert failed: ${error.message}`, details: error.details ?? null, hint: error.hint ?? null },
+        { error: "Upsert failed" },
         { status: 500 },
       );
     }
@@ -1445,8 +1445,7 @@ async function runSeed(req: NextRequest) {
     return NextResponse.json({ inserted: written });
   } catch (err) {
     console.error('[seed-products] unexpected error:', err);
-    const message = err instanceof Error ? err.message : String(err);
-    return NextResponse.json({ error: `Seed failed: ${message}` }, { status: 500 });
+    return NextResponse.json({ error: "Seed failed" }, { status: 500 });
   }
 }
 

@@ -1,6 +1,7 @@
+import { serverError } from '@/lib/api/errors';
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/db-admin';
-import { getAdminSession } from '@/lib/auth/session';
+import { requireAdmin } from '@/lib/auth/require-admin';
 import { ensureBrand } from '@/lib/brand-admin';
 import { normalizeProductImages } from '@/lib/product-images';
 import { normalizeBannerFields } from '@/lib/homepage-banners';
@@ -10,10 +11,9 @@ export async function GET(
   req: NextRequest,
   { params }: { params: { id: string } }
 ) {
-  const session = await getAdminSession();
-  if (!session) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
+  const auth = await requireAdmin();
+  if (!auth.ok) return auth.response;
+  const session = auth.admin;
 
   const { data, error } = await supabaseAdmin
     .from('products')
@@ -22,7 +22,7 @@ export async function GET(
     .maybeSingle();
 
   if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return serverError(error, 500);
   }
   if (!data) {
     return NextResponse.json({ error: 'Product not found' }, { status: 404 });
@@ -35,10 +35,9 @@ export async function PATCH(
   req: NextRequest,
   { params }: { params: { id: string } }
 ) {
-  const session = await getAdminSession();
-  if (!session) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
+  const auth = await requireAdmin();
+  if (!auth.ok) return auth.response;
+  const session = auth.admin;
 
   try {
     const body = await req.json();
@@ -73,7 +72,7 @@ export async function PATCH(
       .single();
 
     if (error) {
-      return NextResponse.json({ error: error.message }, { status: 400 });
+      return serverError(error, 400);
     }
 
     revalidateHomepage();
@@ -87,10 +86,9 @@ export async function DELETE(
   req: NextRequest,
   { params }: { params: { id: string } }
 ) {
-  const session = await getAdminSession();
-  if (!session) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
+  const auth = await requireAdmin();
+  if (!auth.ok) return auth.response;
+  const session = auth.admin;
 
   const { error } = await supabaseAdmin
     .from('products')
@@ -98,7 +96,7 @@ export async function DELETE(
     .eq('id', params.id);
 
   if (error) {
-    return NextResponse.json({ error: error.message }, { status: 400 });
+    return serverError(error, 400);
   }
 
   revalidateHomepage();

@@ -1,10 +1,11 @@
+import { sessionMockBase } from '@/test/session-mock';
 import { afterEach, describe, expect, mock, test } from 'bun:test';
 import React from 'react';
 import { act, create } from 'react-test-renderer';
 import { normalizeProductImages } from './product-images';
 import { mapProductRow } from './data/mappers';
 
-mock.module('@/context/I18nContext', () => ({ useI18n: () => ({ locale: 'en', dir: 'ltr', t: key => ({'gallery.viewImage': 'View image'}[key] ?? key) }) }));
+mock.module('@/context/I18nContext', () => ({ I18nProvider: ({ children }) => children, useI18n: () => ({ locale: 'en', dir: 'ltr', t: key => ({'gallery.viewImage': 'View image'}[key] ?? key) }) }));
 mock.module('next/image', () => ({
   default: (props) => {
     if (typeof props.src !== 'string' || !props.src) throw new Error('Invalid image source');
@@ -25,7 +26,7 @@ const query = {
 };
 mock.module('@/lib/brand-admin', () => ({ ensureBrand: async name => name }));
 mock.module('@/lib/db-admin', () => ({ supabaseAdmin: { from: () => query } }));
-mock.module('@/lib/auth/session', () => ({ getAdminSession: async () => ({ id: 'admin' }) }));
+mock.module('@/lib/auth/session', () => ({ ...sessionMockBase, getAdminSession: async () => ({ id: 'admin' }) }));
 
 const { ProductGallery } = await import('../components/product/ProductGallery');
 const listApi = await import('../app/api/admin/products/route');
